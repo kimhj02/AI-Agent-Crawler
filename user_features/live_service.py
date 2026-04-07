@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, AsyncIterator
 from zoneinfo import ZoneInfo
 
 import requests
@@ -18,6 +20,8 @@ from crawler.kumoh_menu import load_menus
 from crawler.push_menus import post_menu_ingest
 from crawler.spring_payload import build_menu_ingest_payload
 from food_image.agent import analyze_food_image_bytes
+
+logger = logging.getLogger(__name__)
 
 
 WEEKDAY_TO_INDEX = {
@@ -106,11 +110,41 @@ def _run_weekly_crawl_once(cfg: ServiceConfig) -> dict[str, Any]:
     return {"status": "ok", "restaurants": len(payload.get("restaurants", []))}
 
 
-app = FastAPI(title="AI-Agent-Crawler Live Service")
 repo_env.load_dotenv_from_repo_root()
 CONFIG = _load_config()
 API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 CLIENT = genai.Client(api_key=API_KEY) if API_KEY else None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    async def _weekly_loop() -> None:
+        tz = ZoneInfo(CONFIG.timezone_name)
+        while True:
+            now = datetime.now(tz)
+            target = _next_run(
+                now,
+                weekday=CONFIG.crawl_weekday,
+                hour=CONFIG.crawl_hour,
+                minute=CONFIG.crawl_minute,
+            )
+            await asyncio.sleep(max((target - now).total_seconds(), 1))
+            try:
+                _run_weekly_crawl_once(CONFIG)
+            except Exception:
+                # 실패 시 프로세스를 죽이지 않고 다음 주기를 기다린다.
+                logger.exception("weekly crawl forwarding failed")
+
+    app.state.weekly_task = asyncio.create_task(_weekly_loop())
+    try:
+        yield
+    finally:
+        task = getattr(app.state, "weekly_task", None)
+        if task:
+            task.cancel()
+
+
+app = FastAPI(title="AI-Agent-Crawler Live Service", lifespan=lifespan)
 
 
 @app.get("/health")
@@ -176,30 +210,3 @@ async def analyze_image_and_forward(
     return {"status": "ok", "forwardStatus": res.status_code, "analysis": analysis}
 
 
-@app.on_event("startup")
-async def start_scheduler() -> None:
-    async def _weekly_loop() -> None:
-        tz = ZoneInfo(CONFIG.timezone_name)
-        while True:
-            now = datetime.now(tz)
-            target = _next_run(
-                now,
-                weekday=CONFIG.crawl_weekday,
-                hour=CONFIG.crawl_hour,
-                minute=CONFIG.crawl_minute,
-            )
-            await asyncio.sleep(max((target - now).total_seconds(), 1))
-            try:
-                _run_weekly_crawl_once(CONFIG)
-            except Exception as e:
-                # 실패 시 프로세스를 죽이지 않고 다음 주기를 기다린다.
-                print(f"[weekly-crawl] failed: {e}", flush=True)
-
-    app.state.weekly_task = asyncio.create_task(_weekly_loop())
-
-
-@app.on_event("shutdown")
-async def stop_scheduler() -> None:
-    task = getattr(app.state, "weekly_task", None)
-    if task:
-        task.cancel()
