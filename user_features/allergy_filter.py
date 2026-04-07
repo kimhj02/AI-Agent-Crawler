@@ -207,7 +207,15 @@ def main() -> None:
         )
         raise SystemExit(2) from e
 
-    avoid_df = filter_avoid_dataframe(df, user_set, today_only=args.today_only)
+    try:
+        avoid_df = filter_avoid_dataframe(df, user_set, today_only=args.today_only)
+    except ValueError as e:
+        print(
+            f"알레르기 필터를 적용할 수 없습니다: {args.csv}\n"
+            f"({e})",
+            file=sys.stderr,
+        )
+        raise SystemExit(2) from e
 
     if args.json:
         payload = {
