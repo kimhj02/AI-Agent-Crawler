@@ -12,6 +12,7 @@ from typing import Any
 import pandas as pd
 from google import genai
 from google.genai import types
+from utils.json_extract import extract_json_object
 
 import repo_env
 
@@ -29,15 +30,6 @@ Rules:
   - "menuSummaryEn" (concise English description of the dish set),
   - "allergyNotesEn" (translate and condense allergy hints; say "possible" / "may contain" where appropriate).
 - Keep tone helpful and cautious. Do not claim medical certainty."""
-
-
-def _extract_json_object(text: str) -> dict[str, Any]:
-    text = text.strip()
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        raise ValueError(f"JSON 객체를 찾지 못했습니다: {text[:200]}...")
-    return json.loads(text[start : end + 1])
 
 
 def load_rows_from_analysis_csv(path: str, *, limit: int | None) -> list[dict[str, Any]]:
@@ -83,7 +75,7 @@ Produce the JSON object as specified in the system instructions. Set "locale" to
     raw = (getattr(resp, "text", "") or "").strip()
     if not raw:
         raise RuntimeError("모델 응답이 비었습니다.")
-    parsed = _extract_json_object(raw)
+    parsed = extract_json_object(raw)
     if not isinstance(parsed, dict):
         raise RuntimeError("Invalid model response: root JSON is not an object")
     if not all(k in parsed for k in ("locale", "disclaimer", "items")):
