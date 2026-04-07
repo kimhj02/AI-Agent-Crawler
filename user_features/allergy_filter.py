@@ -172,7 +172,21 @@ def main() -> None:
     raw_tokens = [x.strip() for x in args.allergens.split(",")]
     user_set = normalize_user_allergen_tokens(raw_tokens)
 
-    df = pd.read_csv(args.csv, encoding="utf-8-sig")
+    try:
+        df = pd.read_csv(args.csv, encoding="utf-8-sig")
+    except FileNotFoundError:
+        print(f"CSV 파일을 찾을 수 없습니다: {args.csv}", file=sys.stderr)
+        raise SystemExit(2) from None
+    except pd.errors.ParserError as e:
+        print(f"CSV 형식을 해석하지 못했습니다: {args.csv}\n{e}", file=sys.stderr)
+        raise SystemExit(2) from e
+    except Exception as e:
+        print(
+            f"CSV를 읽는 중 오류가 발생했습니다: {args.csv} ({type(e).__name__})",
+            file=sys.stderr,
+        )
+        raise SystemExit(2) from e
+
     avoid_df = filter_avoid_dataframe(df, user_set, today_only=args.today_only)
 
     if args.json:
