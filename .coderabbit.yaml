@@ -1,0 +1,22 @@
+# CodeRabbit — PR 자동 코드 리뷰 설정
+# 문서: https://docs.coderabbit.ai/
+
+language: ko-KR
+
+# 리뷰 톤 (최대 250자)
+tone_instructions: >
+  한국어 존댓말로 간결하게 작성해 주세요.
+  보안(비밀·API 키 노출), 오류 처리, 가독성을 우선 검토하고,
+  비난보다는 실행 가능한 개선 제안을 중심으로 해 주세요.
+
+reviews:
+  profile: chill
+  path_instructions:
+    - path: "**/*.py"
+      instructions: |
+        Python 3 기준으로 검토해 주세요.
+        API 키·토큰 하드코딩, 민감 정보 로그 출력 여부를 확인해 주세요.
+        환경 변수·.env 사용 패턴과 예외 처리 적절성을 봐 주세요.
+    - path: "README.md"
+      instructions: |
+        실행 방법·환경 변수 설명이 변경과 일치하는지 확인해 주세요.
