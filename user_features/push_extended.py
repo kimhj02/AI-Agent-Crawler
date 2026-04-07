@@ -60,10 +60,23 @@ def main() -> None:
         default=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite"),
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--force-empty",
+        action="store_true",
+        help="크롤 결과가 비어 있어도 POST 허용 (기본은 거부)",
+    )
     parser.add_argument("--timeout", type=float, default=120.0)
     args = parser.parse_args()
 
     menus = load_menus()
+    if not menus and not args.dry_run and not args.force_empty:
+        print(
+            "경고: load_menus() 결과가 비었습니다. restaurants 없이 POST하지 않습니다. "
+            "미리보기만 하려면 --dry-run, 빈 페이로드를 내려면 --force-empty",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
     analysis_df = None
     if args.analysis_csv:
         analysis_df = pd.read_csv(args.analysis_csv, encoding="utf-8-sig")
