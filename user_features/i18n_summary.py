@@ -82,7 +82,20 @@ Produce the JSON object as specified in the system instructions. Set "locale" to
     raw = (getattr(resp, "text", "") or "").strip()
     if not raw:
         raise RuntimeError("모델 응답이 비었습니다.")
-    return _extract_json_object(raw)
+    parsed = _extract_json_object(raw)
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Invalid model response: root JSON is not an object")
+    if not all(k in parsed for k in ("locale", "disclaimer", "items")):
+        raise RuntimeError(
+            "Invalid model response: missing locale.disclaimer.items (expected top-level keys)"
+        )
+    if not isinstance(parsed["items"], list):
+        raise RuntimeError("Invalid model response: items is not a list")
+    if len(rows) > 0 and len(parsed["items"]) == 0:
+        raise RuntimeError(
+            "Invalid model response: items is empty but input contained menu rows"
+        )
+    return parsed
 
 
 def main() -> None:
