@@ -97,11 +97,13 @@ def avoid_menus_for_api_payload(df_avoid: pd.DataFrame) -> list[dict[str, object
         matched = row.get("matchedAllergensKo", [])
         if isinstance(matched, str):
             matched = [matched]
+        raw_row_index = row.get("표행")
+        table_row = int(raw_row_index) if pd.notna(raw_row_index) else None
         out.append(
             {
                 "restaurant": row.get("식당"),
                 "dayColumn": row.get("요일열"),
-                "tableRow": int(row["표행"]) if pd.notna(row.get("표행")) else None,
+                "tableRow": table_row,
                 "menuText": row.get("메뉴텍스트"),
                 "matchedAllergensKo": list(matched),
                 "allergySummaryKo": row.get("알레르기_요약", ""),
