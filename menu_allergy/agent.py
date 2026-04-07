@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gemini로 급식 메뉴 셀별 추정 재료·알레르기 정보를 생성합니다 (AI_Agent.ipynb와 동일 로직)."""
+"""Gemini로 급식 메뉴 셀별 추정 재료·알레르기 정보를 생성합니다."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from google import genai
 from google.api_core import exceptions as google_api_exceptions
 from google.genai import types
 
-from kumoh_menu import load_menus
+from crawler.kumoh_menu import load_menus
 
 SYSTEM_INSTRUCTION = """당신은 한국 대학 급식 메뉴 문구를 분석하는 조력자입니다.
 메뉴 이름·반찬 나열에서 **추정되는 재료**와 **알레르기 유발 가능이 있는 식품**을 정리합니다.

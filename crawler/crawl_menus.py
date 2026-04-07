@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""식단표를 수집해 콘솔에 출력합니다 (Crawling.ipynb와 동일 동작)."""
+"""식단표를 수집해 콘솔에 출력합니다."""
 
 from __future__ import annotations
 
 import pandas as pd
 
-from kumoh_menu import URLS, load_menus
+from crawler.kumoh_menu import URLS, load_menus
 
 
 def main() -> None:

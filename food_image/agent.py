@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""음식 이미지를 Gemini Vision으로 분석합니다 (AI_Agent_Image.ipynb와 동일 로직)."""
+"""음식 이미지를 Gemini Vision으로 분석합니다."""
 
 from __future__ import annotations
 
