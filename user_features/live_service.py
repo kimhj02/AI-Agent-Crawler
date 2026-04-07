@@ -57,6 +57,7 @@ class ServiceConfig:
     i18n_locale: str
     weekly_batch_size: int
     weekly_sleep_seconds: float
+    enable_direct_image_analysis: bool
     timezone_name: str
     crawl_weekday: int
     crawl_hour: int
@@ -81,6 +82,10 @@ def _load_config() -> ServiceConfig:
     if not (0 <= hour <= 23 and 0 <= minute <= 59):
         raise RuntimeError("WEEKLY_CRAWL_HOUR/MINUTE out of range")
 
+    enable_direct_image_analysis = (
+        os.environ.get("ENABLE_DIRECT_IMAGE_ANALYSIS", "false").strip().lower() == "true"
+    )
+
     return ServiceConfig(
         spring_menus_url=os.environ.get("SPRING_MENUS_URL", "").strip() or None,
         spring_image_analysis_url=os.environ.get("SPRING_IMAGE_ANALYSIS_URL", "").strip() or None,
@@ -93,6 +98,7 @@ def _load_config() -> ServiceConfig:
         i18n_locale=os.environ.get("I18N_LOCALE", "en"),
         weekly_batch_size=int(os.environ.get("WEEKLY_MENU_BATCH_SIZE", "4")),
         weekly_sleep_seconds=float(os.environ.get("WEEKLY_MENU_SLEEP_SECONDS", "21.0")),
+        enable_direct_image_analysis=enable_direct_image_analysis,
         timezone_name=os.environ.get("SERVICE_TIMEZONE", "Asia/Seoul").strip() or "Asia/Seoul",
         crawl_weekday=WEEKDAY_TO_INDEX[weekday_text],
         crawl_hour=hour,
@@ -274,6 +280,7 @@ def health() -> dict[str, Any]:
         "imageAnalysisConfigured": CONFIG.spring_image_analysis_url is not None,
         "imageIdentifyConfigured": CONFIG.spring_image_identify_url is not None,
         "textAnalysisConfigured": CONFIG.spring_text_analysis_url is not None,
+        "directImageAnalysisEnabled": CONFIG.enable_direct_image_analysis,
         "timezone": CONFIG.timezone_name,
     }
 
@@ -298,6 +305,14 @@ async def analyze_image_and_forward(
     user_id: str | None = None,
     request_id: str | None = None,
 ) -> dict[str, Any]:
+    if not CONFIG.enable_direct_image_analysis:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Direct image analysis is disabled. "
+                "Set ENABLE_DIRECT_IMAGE_ANALYSIS=true to enable."
+            ),
+        )
     if CLIENT is None:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY is not set")
     if not CONFIG.spring_image_analysis_url:
