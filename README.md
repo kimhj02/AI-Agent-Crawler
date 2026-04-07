@@ -197,6 +197,49 @@ python -m user_features.push_extended --url http://localhost:8080/api/menus/inge
 
 **Spring 쪽 JSON에 추가로 실릴 수 있는 필드 (예시):** `userAllergensKo`, `avoidMenus`(영문 키), `i18nSummary`(객체). 서버 DTO는 팀 규칙에 맞게 확장하면 됩니다.
 
+### 8. 상시 서비스 모드 (주간 크롤링 + 실시간 이미지 분석)
+
+Spring에서 실시간 이미지 분석을 호출하려면 Python도 API 서버로 상시 구동해야 합니다.
+
+```bash
+pip install -r requirements.txt
+```
+
+`.env` 예시:
+
+```bash
+SPRING_MENUS_URL=http://localhost:8080/api/menus/ingest
+SPRING_IMAGE_ANALYSIS_URL=http://localhost:8080/api/image-analysis/ingest
+GEMINI_API_KEY=...
+
+# 선택: 인증
+SPRING_API_TOKEN=...
+# SPRING_API_KEY=...
+
+# 선택: 주간 크롤링 시각 (기본: mon 06:00, Asia/Seoul)
+WEEKLY_CRAWL_DAY=mon
+WEEKLY_CRAWL_HOUR=6
+WEEKLY_CRAWL_MINUTE=0
+SERVICE_TIMEZONE=Asia/Seoul
+```
+
+실행:
+
+```bash
+python -m uvicorn user_features.live_service:app --host 0.0.0.0 --port 8000
+```
+
+API:
+
+- `GET /health`: 상태 확인
+- `POST /crawl-and-forward`: 즉시 크롤링 후 `SPRING_MENUS_URL`로 전송
+- `POST /analyze-image-and-forward`: multipart 파일(`image`)을 Gemini로 분석 후 `SPRING_IMAGE_ANALYSIS_URL`로 전송
+  - 선택 파라미터: `user_id`, `request_id`
+
+서비스가 올라가 있으면 내부 스케줄러가 주 1회 크롤링 전송을 자동 실행합니다.
+
+AWS 배포용 스크립트/템플릿은 `deploy/aws/`를 참고하세요.
+
 ## 참고
 
 - CSV·이미지 경로는 **실행 시 현재 작업 디렉터리** 기준입니다. 루트에서 실행하면 `menu_allergy_gemini.csv`, `test_image.jpeg` 등이 그대로 맞습니다.
