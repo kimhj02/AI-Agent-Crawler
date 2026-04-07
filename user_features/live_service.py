@@ -53,8 +53,16 @@ def _load_config() -> ServiceConfig:
     if weekday_text not in WEEKDAY_TO_INDEX:
         raise RuntimeError("WEEKLY_CRAWL_DAY must be one of mon,tue,wed,thu,fri,sat,sun")
 
-    hour = int(os.environ.get("WEEKLY_CRAWL_HOUR", "6"))
-    minute = int(os.environ.get("WEEKLY_CRAWL_MINUTE", "0"))
+    raw_hour = os.environ.get("WEEKLY_CRAWL_HOUR", "6")
+    raw_minute = os.environ.get("WEEKLY_CRAWL_MINUTE", "0")
+    try:
+        hour = int(raw_hour)
+        minute = int(raw_minute)
+    except ValueError as e:
+        raise RuntimeError(
+            "WEEKLY_CRAWL_HOUR/WEEKLY_CRAWL_MINUTE must be integers "
+            "(hour: 0..23, minute: 0..59)"
+        ) from e
     if not (0 <= hour <= 23 and 0 <= minute <= 59):
         raise RuntimeError("WEEKLY_CRAWL_HOUR/MINUTE out of range")
 
