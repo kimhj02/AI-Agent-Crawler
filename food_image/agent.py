@@ -46,14 +46,12 @@ def _extract_json(text: str) -> dict:
     return json.loads(text[start : end + 1])
 
 
-def analyze_food_image(client: genai.Client, model_name: str, image_path: str | Path) -> dict:
-    path = Path(image_path)
-    if not path.exists():
-        raise FileNotFoundError(f"파일이 없습니다: {path}")
-
-    image_bytes = path.read_bytes()
-    mime_type = _guess_mime_type(path)
-
+def analyze_food_image_bytes(
+    client: genai.Client,
+    model_name: str,
+    image_bytes: bytes,
+    mime_type: str,
+) -> dict:
     response = client.models.generate_content(
         model=model_name,
         contents=[
@@ -71,6 +69,17 @@ def analyze_food_image(client: genai.Client, model_name: str, image_path: str | 
         raise RuntimeError("모델 응답이 비어 있습니다.")
 
     return _extract_json(raw)
+
+
+def analyze_food_image(client: genai.Client, model_name: str, image_path: str | Path) -> dict:
+    path = Path(image_path)
+    if not path.exists():
+        raise FileNotFoundError(f"파일이 없습니다: {path}")
+
+    image_bytes = path.read_bytes()
+    mime_type = _guess_mime_type(path)
+
+    return analyze_food_image_bytes(client, model_name, image_bytes, mime_type)
 
 
 def main() -> None:
