@@ -26,7 +26,6 @@ from food_image.agent import analyze_food_image_bytes
 from menu_allergy.agent import analyze_menus_with_gemini, iter_menu_entries, results_to_dataframe
 from user_features.i18n_summary import summarize_for_locale
 from user_features.payloads import build_extended_menu_payload
-from utils.json_extract import extract_json_object
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
@@ -188,14 +187,19 @@ def _analyze_food_text(name: str) -> dict[str, Any]:
     resp = CLIENT.models.generate_content(
         model=CONFIG.gemini_model,
         contents=[prompt],
-        config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=2048),
+        config=types.GenerateContentConfig(
+            temperature=0.2,
+            max_output_tokens=2048,
+            response_mime_type="application/json",
+        ),
     )
-    return extract_json_object(
-        (getattr(resp, "text", "") or "").strip(),
-        exception_cls=RuntimeError,
-        not_found_message="모델 응답에서 JSON 객체를 찾을 수 없습니다.",
-        not_object_message="모델 응답 JSON이 객체 형태가 아닙니다.",
-    )
+    raw = (getattr(resp, "text", "") or "").strip()
+    if not raw:
+        raise RuntimeError("모델 응답이 비어 있습니다.")
+    parsed = json.loads(raw)
+    if not isinstance(parsed, dict):
+        raise RuntimeError("모델 응답 JSON이 객체 형태가 아닙니다.")
+    return parsed
 
 
 def _identify_food_from_image(image_bytes: bytes, mime_type: str) -> dict[str, Any]:
@@ -210,14 +214,19 @@ def _identify_food_from_image(image_bytes: bytes, mime_type: str) -> dict[str, A
             types.Part.from_text(text=prompt),
             types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
         ],
-        config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=512),
+        config=types.GenerateContentConfig(
+            temperature=0.1,
+            max_output_tokens=512,
+            response_mime_type="application/json",
+        ),
     )
-    return extract_json_object(
-        (getattr(resp, "text", "") or "").strip(),
-        exception_cls=RuntimeError,
-        not_found_message="모델 응답에서 JSON 객체를 찾을 수 없습니다.",
-        not_object_message="모델 응답 JSON이 객체 형태가 아닙니다.",
-    )
+    raw = (getattr(resp, "text", "") or "").strip()
+    if not raw:
+        raise RuntimeError("모델 응답이 비어 있습니다.")
+    parsed = json.loads(raw)
+    if not isinstance(parsed, dict):
+        raise RuntimeError("모델 응답 JSON이 객체 형태가 아닙니다.")
+    return parsed
 
 
 def _post_json(url: str, payload: dict[str, Any]) -> requests.Response:
