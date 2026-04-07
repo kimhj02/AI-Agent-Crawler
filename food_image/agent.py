@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import mimetypes
 import os
 from pathlib import Path
@@ -12,6 +11,8 @@ from pathlib import Path
 import repo_env
 from google import genai
 from google.genai import types
+from utils.json_extract import extract_json_object
+import json
 
 SYSTEM_PROMPT = """당신은 음식 이미지를 보고 식재료를 추정하는 도우미입니다.
 반드시 한국어로 답하고, 아래 JSON 객체 하나만 출력하세요.
@@ -37,15 +38,6 @@ def _guess_mime_type(path: Path) -> str:
     return mime or "image/jpeg"
 
 
-def _extract_json(text: str) -> dict:
-    text = text.strip()
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        raise ValueError(f"JSON 객체를 찾지 못했습니다: {text[:200]}...")
-    return json.loads(text[start : end + 1])
-
-
 def analyze_food_image_bytes(
     client: genai.Client,
     model_name: str,
@@ -68,7 +60,7 @@ def analyze_food_image_bytes(
     if not raw:
         raise RuntimeError("모델 응답이 비어 있습니다.")
 
-    return _extract_json(raw)
+    return extract_json_object(raw)
 
 
 def analyze_food_image(client: genai.Client, model_name: str, image_path: str | Path) -> dict:
