@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import sys
@@ -125,7 +126,12 @@ def main() -> None:
     if not api_key:
         raise SystemExit("GEMINI_API_KEY 가 필요합니다 (.env 또는 환경 변수).")
 
-    rows = load_rows_from_analysis_csv(args.csv, limit=args.limit)
+    try:
+        rows = load_rows_from_analysis_csv(args.csv, limit=args.limit)
+    except (OSError, IOError, FileNotFoundError, csv.Error, Exception) as e:
+        print(f"입력 CSV를 읽을 수 없습니다 ({args.csv}): {e}", file=sys.stderr)
+        sys.exit(2)
+
     if not rows:
         raise SystemExit("입력 CSV에 행이 없습니다.")
 
