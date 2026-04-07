@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from io import StringIO
 
 import pandas as pd
 import requests
+from pandas.errors import ParserError
+
+logger = logging.getLogger(__name__)
 
 URLS = {
     "학생식당": "https://www.kumoh.ac.kr/ko/restaurant01.do",
@@ -36,7 +40,13 @@ def load_menus() -> dict[str, pd.DataFrame]:
             df.columns = [str(c).strip() for c in df.columns]
             df = df.replace(r"\s+", " ", regex=True)
             menus[name] = df
-        except Exception as e:
-            print(f"[{name}] 메뉴 로드 실패: {e}")
+        except (
+            requests.exceptions.RequestException,
+            ParserError,
+            ValueError,
+            UnicodeError,
+            OSError,
+        ) as e:
+            logger.warning("[%s] 메뉴 로드 실패: %s", name, type(e).__name__)
             continue
     return menus
