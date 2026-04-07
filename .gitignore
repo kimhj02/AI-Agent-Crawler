@@ -1,0 +1,30 @@
+# 로컬 비밀·환경 — .env, .env.local, .env.dev, .env.test 등 전부 무시
+.env*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# 가상환경
+.venv/
+venv/
+env/
+
+# 도구 / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 임시 (로컬 테스트용 pycache 경로 등)
+.pycache_tmp/
+.pyc_tmp/
