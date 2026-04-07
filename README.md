@@ -135,47 +135,72 @@ public class MenuIngestController {
 
 CORS가 필요하면 `@CrossOrigin` 또는 `WebMvcConfigurer`로 허용 origin을 설정하세요. 다른 경로·필드명을 쓰는 경우 Python 쪽 `crawler/spring_payload.py`의 키를 서버와 동일하게 맞추면 됩니다.
 
-### 5. 사용자 기능: 알레르기 필터
+### 5~7. 사용자 기능 (`user_features/`)
 
-`menu_allergy`로 만든 CSV(`알레르기_요약` 열 필요)에서, **선택한 알레르기가 걸리는 메뉴만** 골라 냅니다.
+외국인·알레르기 사용자를 위한 기능입니다. **먼저 2번**으로 `menu_allergy_gemini.csv` 같은 분석 파일을 만든 뒤 사용하는 것이 일반적입니다.
+
+| 구성 요소 | 하는 일 (한 줄) |
+|-----------|-----------------|
+| `allergen_catalog.py` | 식약처 표시 대상 알레르기 **표준 이름(canonical)** 과 **별칭**(계란→난류, milk→우유 등), 요약문 매칭용 **키워드** 정리 |
+| `allergy_filter.py` | 위 CSV에서 사용자가 고른 알레르기에 **걸리는 메뉴만** 골라 표/JSON 출력 |
+| `i18n_summary.py` | 같은 CSV를 Gemini에 넘겨 **영어 등** 메뉴·알레르기 안내 JSON 생성 (의료 단정 아님) |
+| `payloads.py` | 크롤 원본 JSON + `userAllergensKo` + `avoidMenus` + (선택) `i18nSummary` 를 **한 덩어리**로 만듦 |
+| `push_extended.py` | 위 덩어리를 **Spring으로 POST** (크롤 + 분석 + 선택 i18n 한 번에) |
+
+**데이터 흐름 (개념):**
+
+```
+[2번 CSV] ──► allergy_filter  → "피해야 할 메뉴" 표 또는 JSON
+     │
+     ├──► i18n_summary        → 외국인용 요약 JSON 파일
+     │
+     └──► push_extended       → Spring 서버 (원본 급식 + 필터 + 선택 i18n)
+```
+
+#### 5. 알레르기 필터 (CLI: `allergy_filter`)
+
+- **입력:** `menu_allergy` 결과 CSV (`알레르기_요약` 열 필수)
+- **출력:** 콘솔 표, 또는 `--json` 시 API에 넣기 좋은 `userAllergensKo` + `avoidMenus`
+- **옵션:** `--today-only` → 한국(서울) 기준 **오늘 요일 열**만 대상
 
 ```bash
-# 식약처 표기 기준 canonical 목록
 python -m user_features.allergy_filter --list-allergens
 
-# 콘솔 표
 python -m user_features.allergy_filter --csv menu_allergy_gemini.csv --allergens 우유,대두,난류
 
-# 오늘(한국 서울 요일) 열만
 python -m user_features.allergy_filter --csv menu_allergy_gemini.csv --allergens 우유 --today-only
 
-# API용 JSON (userAllergensKo + avoidMenus)
 python -m user_features.allergy_filter --csv menu_allergy_gemini.csv --allergens 우유,밀 --json
 ```
 
-### 6. 다국어 메뉴·알레르기 요약 (Gemini)
+#### 6. 다국어 요약 (CLI: `i18n_summary`, Gemini 필요)
 
-분석 CSV 일부를 넘겨 **영어 등**으로 요약한 JSON을 만듭니다 (의료 단정 아님 문구 포함).
+- **입력:** 분석 CSV (행 수는 `--limit`으로 제한)
+- **출력:** `locale`, `disclaimer`, `items[]` 등이 담긴 JSON (영어 위주, `--locale`으로 태그 지정)
 
 ```bash
 python -m user_features.i18n_summary --csv menu_allergy_gemini.csv --locale en --limit 20 -o i18n_menu_en.json
 python -m user_features.i18n_summary --help
 ```
 
-### 7. 확장 페이로드로 Spring에 POST
+#### 7. 확장 페이로드 POST (CLI: `push_extended`)
 
-크롤 원본 + (선택) 분석 CSV + 사용자 알레르기 + (선택) i18n 을 한 번에 보냅니다.
+- **하는 일:** 지금 급식표를 크롤한 뒤, 분석 CSV·사용자 알레르기·(선택) i18n을 합쳐 서버로 보냄
+- **사전 준비:** `SPRING_MENUS_URL` 등은 4번과 동일. `--with-i18n` 쓰면 `GEMINI_API_KEY` 필요
 
 ```bash
 python -m user_features.push_extended --dry-run --analysis-csv menu_allergy_gemini.csv --allergens 우유,대두
 
-# i18n까지 Gemini로 생성 후 전송 (API 키·URL 필요)
 python -m user_features.push_extended --url http://localhost:8080/api/menus/ingest \
   --analysis-csv menu_allergy_gemini.csv --allergens 우유 --with-i18n --i18n-locale en
 ```
 
-확장 페이로드에 추가되는 필드 예: `userAllergensKo`, `avoidMenus` (영문 키), `i18nSummary` (객체). 서버 DTO는 프로젝트에 맞게 확장하면 됩니다.
+**Spring 쪽 JSON에 추가로 실릴 수 있는 필드 (예시):** `userAllergensKo`, `avoidMenus`(영문 키), `i18nSummary`(객체). 서버 DTO는 팀 규칙에 맞게 확장하면 됩니다.
 
 ## 참고
 
 - CSV·이미지 경로는 **실행 시 현재 작업 디렉터리** 기준입니다. 루트에서 실행하면 `menu_allergy_gemini.csv`, `test_image.jpeg` 등이 그대로 맞습니다.
+
+---
+
+이 저장소의 일부 문서·코드는 [Cursor](https://cursor.com) 로 편집·보조 작성되었습니다.
