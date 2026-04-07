@@ -104,23 +104,43 @@ def filter_avoid_dataframe(
     return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
+def _nullable_cell(val: object) -> str | None:
+    """DataFrame 셀 값 → JSON 직렬화용: NaN/NA 는 None."""
+    if val is None or pd.isna(val):
+        return None
+    return str(val)
+
+
+def _matched_allergens_primitives(matched: object) -> list[str]:
+    """matchedAllergensKo → NaN 없는 str 리스트."""
+    if matched is None or (isinstance(matched, float) and pd.isna(matched)):
+        return []
+    if isinstance(matched, str):
+        return [matched] if matched else []
+    out: list[str] = []
+    for item in list(matched):
+        if pd.isna(item):
+            continue
+        out.append(str(item))
+    return out
+
+
 def avoid_menus_for_api_payload(df_avoid: pd.DataFrame) -> list[dict[str, object]]:
     """Spring 등 REST용 영문 키 목록."""
     out: list[dict[str, object]] = []
     for _, row in df_avoid.iterrows():
-        matched = row.get("matchedAllergensKo", [])
-        if isinstance(matched, str):
-            matched = [matched]
         raw_row_index = row.get("표행")
         table_row = int(raw_row_index) if pd.notna(raw_row_index) else None
         out.append(
             {
-                "restaurant": row.get("식당"),
-                "dayColumn": row.get("요일열"),
+                "restaurant": _nullable_cell(row.get("식당")),
+                "dayColumn": _nullable_cell(row.get("요일열")),
                 "tableRow": table_row,
-                "menuText": row.get("메뉴텍스트"),
-                "matchedAllergensKo": list(matched),
-                "allergySummaryKo": row.get("알레르기_요약", ""),
+                "menuText": _nullable_cell(row.get("메뉴텍스트")),
+                "matchedAllergensKo": _matched_allergens_primitives(
+                    row.get("matchedAllergensKo", [])
+                ),
+                "allergySummaryKo": _nullable_cell(row.get("알레르기_요약")),
             }
         )
     return out
