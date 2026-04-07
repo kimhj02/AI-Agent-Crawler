@@ -34,6 +34,8 @@ def iter_menu_entries(menus: dict[str, pd.DataFrame]) -> list[dict[str, Any]]:
     for place, df in menus.items():
         for col in df.columns:
             for idx, val in df[col].items():
+                if val is None or pd.isna(val):
+                    continue
                 s = str(val).strip()
                 if not s or "운영 없음" in s:
                     continue
