@@ -103,8 +103,8 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
     @router.post("/analyze-image-and-forward")
     async def analyze_image_and_forward(
         image: UploadFile = File(...),
-        user_id: str | None = None,
-        request_id: str | None = None,
+        user_id: str | None = Form(default=None),
+        request_id: str | None = Form(default=None),
     ) -> dict[str, Any]:
         if not cfg.enable_direct_image_analysis:
             raise HTTPException(
@@ -196,7 +196,7 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
     @router.post("/identify-image-and-forward")
     async def identify_image_and_forward(
         image: UploadFile = File(...),
-        request_id: str | None = None,
+        request_id: str | None = Form(default=None),
     ) -> dict[str, Any]:
         if not cfg.spring_image_identify_url:
             raise HTTPException(status_code=500, detail="SPRING_IMAGE_IDENTIFY_URL is not set")
