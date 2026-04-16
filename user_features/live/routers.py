@@ -69,6 +69,13 @@ def _v1_bad_request(msg: str):
     return v1_error("COM_001", msg, status_code=400)
 
 
+def _safe_float(value: Any, default: float = 0.5) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
     """기존 운영 호환용 엔드포인트 묶음."""
     cfg = ctx.config
@@ -303,7 +310,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
                 ingredient_codes: list[dict[str, Any]] = []
                 dedup: set[str] = set()
 
-                for idx, ingredient in enumerate(analysis.get("ingredientsKo", [])):
+                for idx, ingredient in enumerate(analysis.get("ingredientsKo") or []):
                     code = map_ingredient_code(str(ingredient).strip())
                     if not code or code in dedup:
                         continue
@@ -315,7 +322,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
                         }
                     )
 
-                for allergen in analysis.get("allergensKo", []):
+                for allergen in analysis.get("allergensKo") or []:
                     if not isinstance(allergen, dict):
                         continue
                     code = map_ingredient_code(str(allergen.get("name", "")).strip())
@@ -364,6 +371,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         results: list[dict[str, Any]] = []
         for menu in payload.menus:
             translations: list[dict[str, str]] = []
+            translation_errors: list[dict[str, str]] = []
             for lang in payload.targetLanguages:
                 lang_code = lang.strip()
                 if not lang_code:
@@ -378,13 +386,20 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
                         menu.menuName,
                     )
                     translations.append({"langCode": lang_code, "translatedName": translated})
-                except Exception:
-                    continue
+                except Exception as e:
+                    logger.warning(
+                        "translation failed menuId=%s lang=%s: %s",
+                        menu.menuId,
+                        lang_code,
+                        e,
+                    )
+                    translation_errors.append({"langCode": lang_code, "reason": str(e)})
             results.append(
                 {
                     "menuId": menu.menuId,
                     "sourceName": menu.menuName,
                     "translations": translations,
+                    "translationErrors": translation_errors,
                 }
             )
 
@@ -490,7 +505,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
             return v1_error("AI_003", f"음식 이미지 분석 실패: {e}", status_code=500)
 
         ingredients = []
-        for item in analysis.get("추정_식재료", []):
+        for item in analysis.get("추정_식재료") or []:
             if not isinstance(item, dict):
                 continue
             code = map_ingredient_code(str(item.get("재료", "")).strip())
@@ -499,7 +514,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
             ingredients.append(
                 {
                     "ingredientCode": code,
-                    "confidence": float(item.get("신뢰도", 0.5)),
+                    "confidence": _safe_float(item.get("신뢰도", 0.5), default=0.5),
                 }
             )
         return v1_success(
