@@ -99,7 +99,7 @@ curl http://localhost:8000/health
 
 | API | 요청 타입 | 대표 성공 코드 | 대표 실패 코드 |
 |-----|-----------|----------------|----------------|
-| `POST /api/v1/python/meals/crawl` | `application/json` | `200` | `400`, `404` |
+| `POST /api/v1/python/meals/crawl` | `application/json` | `200` | `400`, `502`, `500` |
 | `POST /api/v1/python/menus/analyze` | `application/json` | `200` | `400`, `500` |
 | `POST /api/v1/python/menus/translate` | `application/json` | `200` | `400`, `500` |
 | `POST /api/v1/translations` | `application/json` | `200` | `400`, `500` |
@@ -146,12 +146,12 @@ curl http://localhost:8000/health
 }
 ```
 
-실패 (`404`)
+실패 (`400`)
 ```json
 {
   "success": false,
-  "code": "PYM_404",
-  "msg": "요청한 식당(학생식당)의 식단표를 찾을 수 없습니다."
+  "code": "PYM_400",
+  "msg": "요청 식단 조회 조건이 유효하지 않거나 데이터가 없습니다. (cafeteriaName=학생식당, sourceUrl=https://www.kumoh.ac.kr/ko/restaurant01.do, reason=...)"
 }
 ```
 
@@ -363,7 +363,9 @@ curl http://localhost:8000/health
 | `AI_001` | AI 실행 불가 (예: `GEMINI_API_KEY` 누락) |
 | `AI_002` | 번역 실패 |
 | `AI_003` | 이미지 분석 실패 |
-| `PYM_404` | 요청 대상 식당/데이터를 찾을 수 없음 |
+| `PYM_400` | 요청 식단 조회 조건 오류/데이터 미존재 |
+| `PYM_502` | 외부 크롤링 소스 조회 실패(재시도 가능) |
+| `PYM_500` | 식단 조회 중 예상치 못한 내부 오류 |
 
 #### 3-5. 레거시/내부 포워딩 엔드포인트 (호환 유지)
 - `GET /health`
