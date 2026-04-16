@@ -625,5 +625,3 @@ sudo systemctl restart nginx
 - CSV·이미지 경로는 **실행 시 현재 작업 디렉터리** 기준입니다. 루트에서 실행하면 `menu_allergy_gemini.csv`, `test_image.jpeg` 등이 그대로 맞습니다.
 
 ---
-
-이 저장소의 일부 문서·코드는 [Cursor](https://cursor.com) 로 편집·보조 작성되었습니다.
