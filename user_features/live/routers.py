@@ -34,6 +34,7 @@ from user_features.live.service_ops import (
     map_ingredient_code,
     post_json,
     run_weekly_crawl_once,
+    sanitize_url_for_log,
     translate_text_with_gemini,
     v1_error,
     v1_success,
@@ -183,11 +184,15 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
                 cfg.gemini_model,
                 food_name.strip(),
             )
-            payload = {
-                "foodNameInput": food_name.strip(),
-                "capturedAt": datetime.now(ZoneInfo(cfg.timezone_name)).isoformat(),
-                "analysis": analysis,
-            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"텍스트 음식 분석 실패: {e}") from e
+
+        payload = {
+            "foodNameInput": food_name.strip(),
+            "capturedAt": datetime.now(ZoneInfo(cfg.timezone_name)).isoformat(),
+            "analysis": analysis,
+        }
+        try:
             res = await asyncio.to_thread(
                 post_json,
                 url=cfg.spring_text_analysis_url,
@@ -195,8 +200,8 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
                 token=cfg.spring_api_token,
                 api_key=cfg.spring_api_key,
             )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"텍스트 음식 분석 실패: {e}") from e
+        except requests.RequestException as e:
+            raise HTTPException(status_code=502, detail=f"Spring 전송 실패: {e}") from e
 
         if not res.ok:
             raise HTTPException(status_code=502, detail=f"Spring 응답 오류 HTTP {res.status_code}")
@@ -221,11 +226,15 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
                 image_bytes,
                 mime_type,
             )
-            payload = {
-                "requestId": request_id,
-                "capturedAt": datetime.now(ZoneInfo(cfg.timezone_name)).isoformat(),
-                "identified": identified,
-            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"이미지 음식 식별 실패: {e}") from e
+
+        payload = {
+            "requestId": request_id,
+            "capturedAt": datetime.now(ZoneInfo(cfg.timezone_name)).isoformat(),
+            "identified": identified,
+        }
+        try:
             res = await asyncio.to_thread(
                 post_json,
                 url=cfg.spring_image_identify_url,
@@ -233,8 +242,8 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
                 token=cfg.spring_api_token,
                 api_key=cfg.spring_api_key,
             )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"이미지 음식 식별 실패: {e}") from e
+        except requests.RequestException as e:
+            raise HTTPException(status_code=502, detail=f"Spring 전송 실패: {e}") from e
 
         if not res.ok:
             raise HTTPException(status_code=502, detail=f"Spring 응답 오류 HTTP {res.status_code}")
@@ -274,8 +283,8 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
             )
         except (CrawlSourceUpstreamError, requests.exceptions.RequestException, OSError) as e:
             logger.warning(
-                "upstream crawl source unavailable sourceUrl=%s cafeteriaName=%s: %s",
-                payload.sourceUrl,
+                "upstream crawl source unavailable source=%s cafeteriaName=%s: %s",
+                sanitize_url_for_log(payload.sourceUrl),
                 payload.cafeteriaName,
                 e,
             )
@@ -289,8 +298,8 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
             )
         except Exception as e:
             logger.exception(
-                "unexpected error while loading menu table sourceUrl=%s cafeteriaName=%s",
-                payload.sourceUrl,
+                "unexpected error while loading menu table source=%s cafeteriaName=%s",
+                sanitize_url_for_log(payload.sourceUrl),
                 payload.cafeteriaName,
             )
             return v1_error(

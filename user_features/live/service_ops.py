@@ -225,15 +225,30 @@ def infer_meal_type(column_name: str) -> str:
     return "LUNCH"
 
 
-def extract_date_from_column(column_name: str, year: int) -> date | None:
+def sanitize_url_for_log(source_url: str) -> str:
+    parsed = urlparse(source_url)
+    host = parsed.hostname or ""
+    path = parsed.path or "/"
+    return f"{parsed.scheme}://{host}{path}"
+
+
+def extract_date_from_column(column_name: str, start: date, end: date) -> date | None:
     match = re.search(r"(\d{1,2})\.(\d{1,2})", column_name)
     if not match:
         return None
     month, day = int(match.group(1)), int(match.group(2))
-    try:
-        return date(year, month, day)
-    except ValueError:
-        return None
+    candidate_years = [start.year]
+    if end.year != start.year:
+        candidate_years.append(end.year)
+
+    for year in candidate_years:
+        try:
+            candidate = date(year, month, day)
+        except ValueError:
+            continue
+        if start <= candidate <= end:
+            return candidate
+    return None
 
 
 def build_daily_meals(
@@ -245,7 +260,7 @@ def build_daily_meals(
 ) -> list[dict[str, Any]]:
     meals: list[dict[str, Any]] = []
     for column in table.columns:
-        meal_date = extract_date_from_column(str(column), start.year)
+        meal_date = extract_date_from_column(str(column), start, end)
         if meal_date is None or not (start <= meal_date <= end):
             continue
         menus: list[dict[str, Any]] = []
@@ -319,8 +334,8 @@ def load_menu_table_for_source(
     ) as e:
         source_fetch_error = e
         logger.warning(
-            "sourceUrl fetch/parse failed (source_url=%s): %s",
-            source_url,
+            "sourceUrl fetch/parse failed (source=%s): %s",
+            sanitize_url_for_log(source_url),
             e,
             exc_info=True,
         )
