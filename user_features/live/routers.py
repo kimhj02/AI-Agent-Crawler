@@ -19,6 +19,7 @@ from user_features.live.api_models import (
     PythonMenuAnalysisRequest,
     PythonMenuTranslationRequest,
 )
+from user_features.live.services import LiveService
 from user_features.live.runtime import (
     ALLOWED_MIME_TYPES,
     API_V1_PREFIX,
@@ -27,15 +28,7 @@ from user_features.live.runtime import (
 )
 from user_features.live.service_ops import (
     CrawlSourceUpstreamError,
-    analyze_food_text,
-    build_daily_meals,
-    identify_food_from_image,
-    load_menu_table_for_source,
-    map_ingredient_code,
-    post_json,
-    run_weekly_crawl_once,
     sanitize_url_for_log,
-    translate_text_with_gemini,
     v1_error,
     v1_success,
     validate_accept_language,
@@ -81,8 +74,9 @@ def _safe_float(value: Any, default: float = 0.5) -> float:
 
 def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
     """기존 운영 호환용 엔드포인트 묶음."""
-    cfg = ctx.config
-    client = ctx.client
+    service = LiveService(ctx)
+    cfg = service.cfg
+    client = service.client
     router = APIRouter()
 
     @router.get("/health")
@@ -106,7 +100,7 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
         ):
             raise HTTPException(status_code=401, detail="Unauthorized")
         try:
-            return run_weekly_crawl_once(cfg, client)
+            return service.run_weekly_crawl_once()
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -152,11 +146,9 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
         }
         try:
             res = await asyncio.to_thread(
-                post_json,
+                service.forward_to_spring,
                 url=cfg.spring_image_analysis_url,
                 payload=payload,
-                token=cfg.spring_api_token,
-                api_key=cfg.spring_api_key,
             )
         except requests.RequestException as e:
             raise HTTPException(status_code=502, detail=f"Spring 전송 실패: {e}") from e
@@ -178,12 +170,7 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
             raise HTTPException(status_code=400, detail="food_name is empty")
 
         try:
-            analysis = await asyncio.to_thread(
-                analyze_food_text,
-                client,
-                cfg.gemini_model,
-                food_name.strip(),
-            )
+            analysis = await asyncio.to_thread(service.analyze_food_text, food_name.strip())
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"텍스트 음식 분석 실패: {e}") from e
 
@@ -194,11 +181,9 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
         }
         try:
             res = await asyncio.to_thread(
-                post_json,
+                service.forward_to_spring,
                 url=cfg.spring_text_analysis_url,
                 payload=payload,
-                token=cfg.spring_api_token,
-                api_key=cfg.spring_api_key,
             )
         except requests.RequestException as e:
             raise HTTPException(status_code=502, detail=f"Spring 전송 실패: {e}") from e
@@ -219,13 +204,7 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
         _validate_image_upload_or_raise(image, image_bytes, mime_type)
 
         try:
-            identified = await asyncio.to_thread(
-                identify_food_from_image,
-                client,
-                cfg.gemini_model,
-                image_bytes,
-                mime_type,
-            )
+            identified = await asyncio.to_thread(service.identify_food_from_image, image_bytes, mime_type)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"이미지 음식 식별 실패: {e}") from e
 
@@ -236,11 +215,9 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
         }
         try:
             res = await asyncio.to_thread(
-                post_json,
+                service.forward_to_spring,
                 url=cfg.spring_image_identify_url,
                 payload=payload,
-                token=cfg.spring_api_token,
-                api_key=cfg.spring_api_key,
             )
         except requests.RequestException as e:
             raise HTTPException(status_code=502, detail=f"Spring 전송 실패: {e}") from e
@@ -254,8 +231,9 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
 
 def create_v1_router(ctx: RuntimeContext) -> APIRouter:
     """신규 `/api/v1` 스펙 엔드포인트 묶음."""
-    cfg = ctx.config
-    client = ctx.client
+    service = LiveService(ctx)
+    cfg = service.cfg
+    client = service.client
     router = APIRouter(prefix=API_V1_PREFIX)
 
     @router.post("/python/meals/crawl")
@@ -268,10 +246,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
             return _v1_bad_request("startDate는 endDate보다 이후일 수 없습니다.")
 
         try:
-            table = load_menu_table_for_source(
-                cafeteria_name=payload.cafeteriaName,
-                source_url=payload.sourceUrl,
-            )
+            table = service.load_menu_table_for_source(payload.cafeteriaName, payload.sourceUrl)
         except RuntimeError as e:
             return v1_error(
                 "PYM_400",
@@ -311,7 +286,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
                 status_code=500,
             )
 
-        meals = build_daily_meals(
+        meals = service.build_daily_meals(
             cafeteria_name=payload.cafeteriaName,
             table=table,
             start=payload.startDate,
@@ -344,16 +319,14 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
             try:
                 async with semaphore:
                     analysis = await asyncio.to_thread(
-                        analyze_food_text,
-                        client,
-                        cfg.gemini_model,
+                        service.analyze_food_text,
                         target.menuName,
                     )
                 ingredient_codes: list[dict[str, Any]] = []
                 dedup: set[str] = set()
 
                 for idx, ingredient in enumerate(analysis.get("ingredientsKo") or []):
-                    code = map_ingredient_code(str(ingredient).strip())
+                    code = service.map_ingredient_code(str(ingredient).strip())
                     if not code or code in dedup:
                         continue
                     dedup.add(code)
@@ -367,7 +340,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
                 for allergen in analysis.get("allergensKo") or []:
                     if not isinstance(allergen, dict):
                         continue
-                    code = map_ingredient_code(str(allergen.get("name", "")).strip())
+                    code = service.map_ingredient_code(str(allergen.get("name", "")).strip())
                     if not code or code in dedup:
                         continue
                     dedup.add(code)
@@ -421,9 +394,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
                 try:
                     async with semaphore:
                         translated = await asyncio.to_thread(
-                            translate_text_with_gemini,
-                            client,
-                            cfg.gemini_model,
+                            service.translate_text,
                             "ko",
                             lang_code,
                             menu.menuName,
@@ -469,9 +440,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
             return _v1_bad_request(str(e))
         try:
             translated = await asyncio.to_thread(
-                translate_text_with_gemini,
-                client,
-                cfg.gemini_model,
+                service.translate_text,
                 payload.sourceLang,
                 payload.targetLang,
                 payload.text,
@@ -509,11 +478,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
 
         try:
             identified = await asyncio.to_thread(
-                identify_food_from_image,
-                client,
-                cfg.gemini_model,
-                image_bytes,
-                mime_type,
+                service.identify_food_from_image, image_bytes, mime_type
             )
         except Exception as e:
             return v1_error("AI_003", f"메뉴판 이미지 분석 실패: {e}", status_code=500)
@@ -564,7 +529,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         for item in analysis.get("추정_식재료") or []:
             if not isinstance(item, dict):
                 continue
-            code = map_ingredient_code(str(item.get("재료", "")).strip())
+            code = service.map_ingredient_code(str(item.get("재료", "")).strip())
             if not code:
                 continue
             ingredients.append(

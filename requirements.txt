@@ -7,3 +7,4 @@ lxml>=4.9.0
 Pillow>=10.3.0
 fastapi>=0.115.0
 uvicorn>=0.30.0
+pytest>=8.0.0
