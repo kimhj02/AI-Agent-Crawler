@@ -57,6 +57,7 @@ def _assert_status(resp: requests.Response, expected_status: int, label: str) ->
 
 
 def run_suite(base_url: str) -> None:
+    has_gemini_key = bool((os.environ.get("GEMINI_API_KEY") or "").strip())
     tests = []
 
     # 정상 케이스
@@ -92,7 +93,7 @@ def run_suite(base_url: str) -> None:
                 f"{base_url}/api/v1/python/menus/analyze",
                 json={"menus": [{"menuId": 1, "menuName": "김치찌개"}]},
             ),
-            (200, 500),
+            200 if has_gemini_key else 500,
         )
     )
     tests.append(
@@ -106,7 +107,7 @@ def run_suite(base_url: str) -> None:
                     "targetLanguages": ["en"],
                 },
             ),
-            (200, 500),
+            200 if has_gemini_key else 500,
         )
     )
     tests.append(
@@ -126,12 +127,18 @@ def run_suite(base_url: str) -> None:
 
     passed = 0
     for label, resp, expected in tests:
-        if isinstance(expected, tuple):
-            if resp.status_code not in expected:
-                _assert_status(resp, expected[0], label)
-        else:
-            _assert_status(resp, expected, label)
-        if label == "GET /openapi.json (spring-compat 비노출 확인)":
+        _assert_status(resp, expected, label)
+
+        if "/python/menus/analyze" in resp.url or "/python/menus/translate" in resp.url:
+            body = resp.json()
+            if has_gemini_key:
+                if body.get("success") is not True:
+                    raise AssertionError(f"{label}: GEMINI_API_KEY가 있을 때 success=true여야 합니다.")
+            else:
+                if body.get("code") != "AI_001":
+                    raise AssertionError(f"{label}: GEMINI_API_KEY가 없을 때 code=AI_001이어야 합니다.")
+
+        if "/openapi.json" in resp.url:
             body = resp.json()
             paths = body.get("paths", {})
             if "/auth/login" in paths or "/api/v1/settings/language" in paths:

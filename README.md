@@ -294,7 +294,6 @@ python3 scripts/smoke_api_regression.py --use-existing-server --port 8000
 - 경로: `docs/postman/ai-agent-crawler-regression.postman_collection.json`
 - 변수:
   - `baseUrl` (기본값: `http://127.0.0.1:8000`)
-  - `token` (기본값: `test-user-token`)
 - 포함 항목:
   - health 체크
   - 식단 크롤링/분석/번역 엔드포인트
