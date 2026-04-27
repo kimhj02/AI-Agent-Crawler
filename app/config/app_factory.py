@@ -15,6 +15,7 @@ from fastapi.exceptions import RequestValidationError
 
 from app.config.runtime import API_V1_PREFIX, RuntimeContext
 from app.controller.live_router import create_legacy_router, create_v1_router
+from app.controller.spring_compat_router import create_spring_compat_router
 from app.util.service_ops import next_run, run_weekly_crawl_once, v1_error
 
 logger = logging.getLogger(__name__)
@@ -80,4 +81,5 @@ def create_app(ctx: RuntimeContext) -> FastAPI:
 
     app.include_router(create_legacy_router(ctx))
     app.include_router(create_v1_router(ctx))
+    app.include_router(create_spring_compat_router(ctx))
     return app

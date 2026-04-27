@@ -92,6 +92,116 @@ curl http://localhost:8000/openapi.json
 - `POST /api/v1/ai/menu-board/analyze`
 - `POST /api/v1/ai/food-images/analyze`
 
+## API 명세
+
+### 1) `POST /api/v1/python/meals/crawl`
+
+- 용도: 학교/식당/기간 기준으로 식단 크롤링
+- 요청 `Content-Type`: `application/json`
+
+요청 예시:
+
+```json
+{
+  "schoolName": "금오공과대학교",
+  "cafeteriaName": "학생식당",
+  "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
+  "startDate": "2026-04-15",
+  "endDate": "2026-04-21"
+}
+```
+
+성공 예시:
+
+```json
+{
+  "success": true,
+  "data": {
+    "schoolName": "금오공과대학교",
+    "cafeteriaName": "학생식당",
+    "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
+    "startDate": "2026-04-15",
+    "endDate": "2026-04-21",
+    "meals": []
+  }
+}
+```
+
+주요 실패 코드: `COM_002`, `PYM_400`, `PYM_502`, `PYM_500`
+
+### 2) `POST /api/v1/python/menus/analyze`
+
+- 용도: 메뉴 텍스트를 AI로 분석해 재료 코드 추정
+
+요청 예시:
+
+```json
+{
+  "menus": [
+    {"menuId": 101, "menuName": "김치찌개"}
+  ]
+}
+```
+
+주요 실패 코드: `COM_002`, `AI_001`
+
+### 3) `POST /api/v1/python/menus/translate`
+
+- 용도: 메뉴명을 다국어로 번역
+
+요청 예시:
+
+```json
+{
+  "menus": [
+    {"menuId": 101, "menuName": "김치찌개"}
+  ],
+  "targetLanguages": ["en", "ja"]
+}
+```
+
+주요 실패 코드: `COM_002`, `AI_001`
+
+### 4) `POST /api/v1/translations`
+
+- 용도: 자유 문장 번역
+
+요청 예시:
+
+```json
+{
+  "sourceLang": "ko",
+  "targetLang": "en",
+  "text": "이 음식에 밀가루가 들어가나요?"
+}
+```
+
+주요 실패 코드: `COM_002`, `AI_002`
+
+### 5) `POST /api/v1/ai/menu-board/analyze`
+
+- 용도: 메뉴판 이미지에서 메뉴명 인식
+- 요청 `Content-Type`: `multipart/form-data`
+- 폼 필드:
+  - `image`: 이미지 파일
+  - `requestId`: 선택
+
+주요 실패 코드: `COM_001`, `AI_001`, `AI_003`
+
+### 6) `POST /api/v1/ai/food-images/analyze`
+
+- 용도: 음식 이미지에서 식재료 추정
+- 요청 `Content-Type`: `multipart/form-data`
+- 폼 필드:
+  - `image`: 이미지 파일
+  - `requestId`: 선택
+
+주요 실패 코드: `COM_001`, `AI_001`, `AI_003`
+
+### 공통 헤더
+
+- `Accept-Language`: `ko`, `en`, `zh-CN`, `vi`, `ja` (예: `en-US` 허용)
+
 레거시 호환 API:
 
 - `GET /health`
@@ -99,6 +209,34 @@ curl http://localhost:8000/openapi.json
 - `POST /identify-image-and-forward`
 - `POST /analyze-food-text-and-forward`
 - `POST /analyze-image-and-forward`
+
+## Swagger 사용 방법
+
+### 1) Swagger UI 접속
+
+```bash
+python3 -m uvicorn user_features.live_service:app --host 0.0.0.0 --port 8000
+open http://localhost:8000/docs
+```
+
+### 2) OpenAPI JSON 확인
+
+```bash
+curl http://localhost:8000/openapi.json
+```
+
+### 3) 엔드포인트 테스트 절차
+
+1. `/docs` 접속 후 테스트할 API 선택
+2. `Try it out` 클릭
+3. 요청 파라미터/Body 입력
+4. `Execute` 클릭
+5. Response Body/Code 확인
+
+### 4) 인증이 필요한 레거시 API 테스트
+
+- `POST /crawl-and-forward`는 `SPRING_API_TOKEN`이 설정된 경우 Bearer 토큰 필요
+- Swagger 우측 상단 `Authorize`에서 `Bearer <token>` 형태로 입력
 
 ## CLI 실행 (scripts)
 
@@ -130,6 +268,26 @@ python3 scripts/allergy_filter.py --csv menu_allergy_gemini.csv --allergens "난
 ```bash
 python3 -m pytest -q tests/live
 ```
+
+### API 회귀 테스트 (자동)
+
+```bash
+python3 scripts/smoke_api_regression.py
+```
+
+- 서버를 자동으로 기동/종료하면서 Spring 호환 핵심 API를 점검합니다.
+- 이미 서버가 떠 있다면 아래처럼 실행합니다.
+
+```bash
+python3 scripts/smoke_api_regression.py --use-existing-server
+```
+
+### Postman 컬렉션
+
+- 경로: `docs/postman/ai-agent-crawler-regression.postman_collection.json`
+- 변수:
+  - `baseUrl` (기본값: `http://127.0.0.1:8000`)
+  - `token` (기본값: `test-user-token`)
 
 ## 운영 참고
 
