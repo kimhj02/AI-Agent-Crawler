@@ -20,17 +20,8 @@ def build_menu_ingest_payload(
     source: str = "https://www.kumoh.ac.kr",
     captured_at: datetime | None = None,
 ) -> dict[str, Any]:
-    """급식 DataFrame 묶음을 REST API용 dict로 만듭니다.
-
-    키는 Java/Jackson에서 다루기 쉽게 영문으로 통일합니다.
-
-    - source: 출처 표시
-    - capturedAt: 수집 시각 (UTC ISO-8601)
-    - restaurants: 식당별 columns(열 이름) + rows(행별 셀 문자열 배열)
-    """
     when = captured_at or datetime.now(timezone.utc)
     if when.tzinfo is None:
-        # naive: 벽시계 값을 UTC로 간주 (로컬 타임존으로 해석하지 않음)
         when = datetime(
             when.year,
             when.month,
@@ -50,13 +41,7 @@ def build_menu_ingest_payload(
         rows: list[list[str]] = []
         for _, row in df.iterrows():
             rows.append([_cell_str(row[c]) for c in df.columns])
-        restaurants.append(
-            {
-                "name": place_name,
-                "columns": columns,
-                "rows": rows,
-            }
-        )
+        restaurants.append({"name": place_name, "columns": columns, "rows": rows})
 
     return {
         "source": source,
@@ -71,7 +56,6 @@ def build_menu_ingest_swagger_payload(
     source: str = "https://www.kumoh.ac.kr",
     captured_at: datetime | None = None,
 ) -> dict[str, Any]:
-    """Swagger 공통 응답 래핑(success/data) 형식으로 감싼 payload를 반환합니다."""
     base = build_menu_ingest_payload(
         menus,
         source=source,

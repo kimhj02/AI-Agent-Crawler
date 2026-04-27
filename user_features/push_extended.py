@@ -13,8 +13,8 @@ import requests
 from google import genai
 
 import repo_env
-from crawler.kumoh_menu import load_menus
-from crawler.push_menus import post_menu_ingest
+from app.domain.crawler.kumoh_menu import load_menus
+from app.domain.crawler.push_menus import post_menu_ingest
 from user_features.i18n_summary import load_rows_from_analysis_csv, summarize_for_locale
 from user_features.payloads import build_extended_menu_payload
 

@@ -38,7 +38,7 @@ from app.util.service_ops import (
     v1_success,
     validate_accept_language,
 )
-from food_image.agent import analyze_food_image_bytes
+from app.domain.image.agent import analyze_food_image_bytes
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)

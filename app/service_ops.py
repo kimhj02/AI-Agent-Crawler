@@ -21,9 +21,9 @@ from google.genai import types
 from pandas.errors import ParserError
 
 from app.config.runtime import ALLOWED_ACCEPT_LANGUAGES, CANONICAL_TO_INGREDIENT_CODE, ServiceConfig
-from crawler.kumoh_menu import load_menus
-from crawler.push_menus import post_menu_ingest
-from menu_allergy.agent import analyze_menus_with_gemini, iter_menu_entries, results_to_dataframe
+from app.domain.allergy.agent import analyze_menus_with_gemini, iter_menu_entries, results_to_dataframe
+from app.domain.crawler.kumoh_menu import load_menus
+from app.domain.crawler.push_menus import post_menu_ingest
 from user_features.allergen_catalog import ALIAS_TO_CANONICAL
 from user_features.i18n_summary import summarize_for_locale
 from user_features.payloads import build_extended_menu_payload

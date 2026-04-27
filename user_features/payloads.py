@@ -7,7 +7,7 @@ from typing import Any
 
 import pandas as pd
 
-from crawler.spring_payload import build_menu_ingest_swagger_payload
+from app.domain.crawler.spring_payload import build_menu_ingest_swagger_payload
 from user_features.allergy_filter import (
     avoid_menus_for_api_payload,
     filter_avoid_dataframe,
