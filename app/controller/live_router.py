@@ -93,7 +93,12 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
             "timezone": cfg.timezone_name,
         }
 
-    @router.post("/crawl-and-forward", response_model=LegacyCrawlForwardResponse)
+    @router.post(
+        "/crawl-and-forward",
+        summary="주간 식단 크롤링 후 Spring 전달",
+        description="Python 서버가 식단을 수집/가공한 뒤 Spring Boot 수집 API로 전달합니다.",
+        response_model=LegacyCrawlForwardResponse,
+    )
     def crawl_and_forward(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)) -> dict[str, Any]:
         if cfg.spring_api_token and (
             credentials is None
@@ -106,7 +111,12 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
             logger.exception("crawl-and-forward failed")
             raise HTTPException(status_code=500, detail="Internal Server Error")
 
-    @router.post("/analyze-image-and-forward", response_model=LegacyForwardResponse)
+    @router.post(
+        "/analyze-image-and-forward",
+        summary="음식 이미지 분석 후 Spring 전달",
+        description="업로드한 음식 이미지에서 재료/알레르기 정보를 분석하고 결과를 Spring Boot로 전달합니다.",
+        response_model=LegacyForwardResponse,
+    )
     async def analyze_image_and_forward(
         image: UploadFile = File(...),
         user_id: Optional[str] = Form(default=None),
@@ -128,7 +138,12 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
             raise HTTPException(status_code=502, detail=f"Spring 응답 오류 HTTP {res.status_code}: {(res.text or '')[:500]}")
         return {"status": "ok", "forwardStatus": res.status_code, "analysis": analysis}
 
-    @router.post("/analyze-food-text-and-forward", response_model=LegacyForwardResponse)
+    @router.post(
+        "/analyze-food-text-and-forward",
+        summary="음식명 텍스트 분석 후 Spring 전달",
+        description="음식 이름 텍스트를 분석해 재료/알레르기 가능 항목을 생성하고 Spring Boot로 전달합니다.",
+        response_model=LegacyForwardResponse,
+    )
     async def analyze_food_text_and_forward(food_name: str = Body(..., embed=True)) -> dict[str, Any]:
         if not cfg.spring_text_analysis_url:
             raise HTTPException(status_code=500, detail="SPRING_TEXT_ANALYSIS_URL is not set")
@@ -139,7 +154,12 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
             raise HTTPException(status_code=502, detail=f"Spring 응답 오류 HTTP {res.status_code}")
         return {"status": "ok", "forwardStatus": res.status_code, "analysis": analysis}
 
-    @router.post("/identify-image-and-forward", response_model=LegacyForwardResponse)
+    @router.post(
+        "/identify-image-and-forward",
+        summary="이미지 음식명 식별 후 Spring 전달",
+        description="이미지에서 음식명을 식별하고 식별 결과를 Spring Boot로 전달합니다.",
+        response_model=LegacyForwardResponse,
+    )
     async def identify_image_and_forward(
         image: UploadFile = File(...),
         request_id: Optional[str] = Form(default=None),
@@ -165,7 +185,15 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
     client = service.client
     router = APIRouter(prefix=API_V1_PREFIX)
 
-    @router.post("/python/meals/crawl", tags=["v1-meals"], operation_id="crawlMealsV1", response_model=ApiSuccessResponse[PythonMealCrawlDataResponse], responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}})
+    @router.post(
+        "/python/meals/crawl",
+        tags=["v1-meals"],
+        summary="식단 기간 조회/크롤링",
+        description="학교/식당/기간 조건으로 식단을 조회하고 메뉴 목록을 표준 DTO로 반환합니다.",
+        operation_id="crawlMealsV1",
+        response_model=ApiSuccessResponse[PythonMealCrawlDataResponse],
+        responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}},
+    )
     def crawl_meals_v1(payload: PythonMealCrawlRequest, request: Request):
         try:
             validate_accept_language(request.headers.get("Accept-Language"))
@@ -184,7 +212,15 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         meals = service.build_daily_meals(cafeteria_name=payload.cafeteriaName, table=table, start=payload.startDate, end=payload.endDate)
         return v1_success({"schoolName": payload.schoolName, "cafeteriaName": payload.cafeteriaName, "sourceUrl": payload.sourceUrl, "startDate": payload.startDate.isoformat(), "endDate": payload.endDate.isoformat(), "meals": meals})
 
-    @router.post("/python/menus/analyze", tags=["v1-ai"], operation_id="analyzeMenusV1", response_model=ApiSuccessResponse[PythonMenuAnalysisDataResponse], responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}})
+    @router.post(
+        "/python/menus/analyze",
+        tags=["v1-ai"],
+        summary="메뉴 텍스트 AI 분석",
+        description="메뉴명 리스트를 받아 재료 코드/신뢰도 추정 결과를 반환합니다.",
+        operation_id="analyzeMenusV1",
+        response_model=ApiSuccessResponse[PythonMenuAnalysisDataResponse],
+        responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}},
+    )
     async def analyze_menus_v1(payload: PythonMenuAnalysisRequest, request: Request):
         try:
             validate_accept_language(request.headers.get("Accept-Language"))
@@ -195,7 +231,15 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         results = await service.analyze_menus(payload.menus, max_concurrency=cfg.ai_max_concurrent_tasks)
         return v1_success({"results": results})
 
-    @router.post("/python/menus/translate", tags=["v1-translation"], operation_id="translateMenusV1", response_model=ApiSuccessResponse[PythonMenuTranslationDataResponse], responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}})
+    @router.post(
+        "/python/menus/translate",
+        tags=["v1-translation"],
+        summary="메뉴 다국어 번역",
+        description="메뉴명 리스트를 요청 언어 목록으로 번역해 반환합니다.",
+        operation_id="translateMenusV1",
+        response_model=ApiSuccessResponse[PythonMenuTranslationDataResponse],
+        responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}},
+    )
     async def translate_menus_v1(payload: PythonMenuTranslationRequest, request: Request):
         try:
             validate_accept_language(request.headers.get("Accept-Language"))
@@ -210,7 +254,15 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         )
         return v1_success({"results": results})
 
-    @router.post("/translations", tags=["v1-translation"], operation_id="freeTranslationV1", response_model=ApiSuccessResponse[FreeTranslationDataResponse], responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}})
+    @router.post(
+        "/translations",
+        tags=["v1-translation"],
+        summary="자유 문장 번역",
+        description="sourceLang/targetLang 기준으로 일반 텍스트를 번역합니다.",
+        operation_id="freeTranslationV1",
+        response_model=ApiSuccessResponse[FreeTranslationDataResponse],
+        responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}},
+    )
     async def free_translation_v1(payload: FreeTranslationRequest, request: Request):
         try:
             validate_accept_language(request.headers.get("Accept-Language"))
@@ -219,7 +271,15 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         translated = await asyncio.to_thread(service.translate_text, payload.sourceLang, payload.targetLang, payload.text)
         return v1_success({"sourceLang": payload.sourceLang, "targetLang": payload.targetLang, "text": payload.text, "translatedText": translated})
 
-    @router.post("/ai/menu-board/analyze", tags=["v1-ai"], operation_id="analyzeMenuBoardV1", response_model=ApiSuccessResponse[MenuBoardAnalyzeDataResponse], responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}})
+    @router.post(
+        "/ai/menu-board/analyze",
+        tags=["v1-ai"],
+        summary="메뉴판 이미지 인식",
+        description="메뉴판 사진에서 음식명을 인식해 후보 메뉴를 반환합니다.",
+        operation_id="analyzeMenuBoardV1",
+        response_model=ApiSuccessResponse[MenuBoardAnalyzeDataResponse],
+        responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}},
+    )
     async def analyze_menu_board_v1(request: Request, image: UploadFile = File(...), requestId: Optional[str] = Form(default=None)):
         try:
             validate_accept_language(request.headers.get("Accept-Language"))
@@ -235,7 +295,15 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         identified = await asyncio.to_thread(service.identify_food_from_image, image_bytes, mime_type)
         return v1_success({"requestId": requestId, "recognizedMenus": [{"menuName": identified.get("foodNameKo"), "confidence": identified.get("confidence")}]})
 
-    @router.post("/ai/food-images/analyze", tags=["v1-ai"], operation_id="analyzeFoodImageV1", response_model=ApiSuccessResponse[FoodImageAnalyzeDataResponse], responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}})
+    @router.post(
+        "/ai/food-images/analyze",
+        tags=["v1-ai"],
+        summary="음식 이미지 재료/알레르기 분석",
+        description="음식 사진을 분석해 재료 코드와 알레르기 가능 항목을 반환합니다.",
+        operation_id="analyzeFoodImageV1",
+        response_model=ApiSuccessResponse[FoodImageAnalyzeDataResponse],
+        responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}},
+    )
     async def analyze_food_image_v1(request: Request, image: UploadFile = File(...), requestId: Optional[str] = Form(default=None)):
         try:
             validate_accept_language(request.headers.get("Accept-Language"))

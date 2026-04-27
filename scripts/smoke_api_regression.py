@@ -1,8 +1,8 @@
-"""Spring 호환 API 회귀 스모크 테스트 스크립트.
+"""내부 연동 최소 API 회귀 스모크 테스트 스크립트.
 
 기본 동작:
 - uvicorn 서버를 자동 실행
-- 핵심 엔드포인트 호출
+- 최소 핵심 엔드포인트 호출
 - 성공/실패 케이스 검증
 - 서버 자동 종료
 """
@@ -57,8 +57,7 @@ def _assert_status(resp: requests.Response, expected_status: int, label: str) ->
 
 
 def run_suite(base_url: str) -> None:
-    auth_headers = {"Authorization": "Bearer test-user-token"}
-
+    has_gemini_key = bool((os.environ.get("GEMINI_API_KEY") or "").strip())
     tests = []
 
     # 정상 케이스
@@ -71,106 +70,79 @@ def run_suite(base_url: str) -> None:
     )
     tests.append(
         (
-            "POST /auth/login",
+            "POST /api/v1/python/meals/crawl (invalid range)",
             _request(
                 "POST",
-                f"{base_url}/auth/login",
-                json={"idToken": "dummy-id-token", "deviceId": "device-1"},
-            ),
-            200,
-        )
-    )
-    tests.append(
-        (
-            "GET /api/v1/settings/language",
-            _request("GET", f"{base_url}/api/v1/settings/language", headers=auth_headers),
-            200,
-        )
-    )
-    tests.append(
-        (
-            "PATCH /api/v1/settings/language",
-            _request(
-                "PATCH",
-                f"{base_url}/api/v1/settings/language",
-                headers=auth_headers,
-                json={"languageCode": "en"},
-            ),
-            200,
-        )
-    )
-    tests.append(
-        (
-            "GET /api/v1/settings/options/languages",
-            _request("GET", f"{base_url}/api/v1/settings/options/languages", headers=auth_headers),
-            200,
-        )
-    )
-    tests.append(
-        (
-            "POST /api/v1/onboarding/complete",
-            _request(
-                "POST",
-                f"{base_url}/api/v1/onboarding/complete",
-                headers=auth_headers,
+                f"{base_url}/api/v1/python/meals/crawl",
                 json={
-                    "languageCode": "en",
-                    "schoolId": 1,
-                    "allergyCodes": ["EGG"],
-                    "religiousCode": "HALAL",
+                    "schoolName": "금오공과대학교",
+                    "cafeteriaName": "학생식당",
+                    "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
+                    "startDate": "2026-05-01",
+                    "endDate": "2026-04-27",
                 },
             ),
-            200,
-        )
-    )
-    tests.append(
-        (
-            "GET /api/v1/mealcrawl/cafeterias",
-            _request("GET", f"{base_url}/api/v1/mealcrawl/cafeterias", headers=auth_headers),
-            200,
-        )
-    )
-    tests.append(
-        (
-            "GET /api/v1/mealcrawl/weekly-meals",
-            _request(
-                "GET",
-                f"{base_url}/api/v1/mealcrawl/weekly-meals",
-                headers=auth_headers,
-                params={"cafeteriaId": 1, "weekStartDate": "2026-04-27"},
-            ),
-            (200, 502),
-        )
-    )
-
-    # 실패 케이스
-    tests.append(
-        (
-            "GET /api/v1/settings/language (no auth)",
-            _request("GET", f"{base_url}/api/v1/settings/language"),
-            401,
-        )
-    )
-    tests.append(
-        (
-            "PATCH /api/v1/settings/language (invalid code)",
-            _request(
-                "PATCH",
-                f"{base_url}/api/v1/settings/language",
-                headers={"Authorization": "Bearer x"},
-                json={"languageCode": "xx"},
-            ),
             400,
+        )
+    )
+    tests.append(
+        (
+            "POST /api/v1/python/menus/analyze",
+            _request(
+                "POST",
+                f"{base_url}/api/v1/python/menus/analyze",
+                json={"menus": [{"menuId": 1, "menuName": "김치찌개"}]},
+            ),
+            200 if has_gemini_key else 500,
+        )
+    )
+    tests.append(
+        (
+            "POST /api/v1/python/menus/translate",
+            _request(
+                "POST",
+                f"{base_url}/api/v1/python/menus/translate",
+                json={
+                    "menus": [{"menuId": 1, "menuName": "김치찌개"}],
+                    "targetLanguages": ["en"],
+                },
+            ),
+            200 if has_gemini_key else 500,
+        )
+    )
+    tests.append(
+        (
+            "POST /api/v1/ai/food-images/analyze (without file)",
+            _request("POST", f"{base_url}/api/v1/ai/food-images/analyze"),
+            400,
+        )
+    )
+    tests.append(
+        (
+            "GET /openapi.json (spring-compat 비노출 확인)",
+            _request("GET", f"{base_url}/openapi.json"),
+            200,
         )
     )
 
     passed = 0
     for label, resp, expected in tests:
-        if isinstance(expected, tuple):
-            if resp.status_code not in expected:
-                _assert_status(resp, expected[0], label)
-        else:
-            _assert_status(resp, expected, label)
+        _assert_status(resp, expected, label)
+
+        if "/python/menus/analyze" in resp.url or "/python/menus/translate" in resp.url:
+            body = resp.json()
+            if has_gemini_key:
+                if body.get("success") is not True:
+                    raise AssertionError(f"{label}: GEMINI_API_KEY가 있을 때 success=true여야 합니다.")
+            else:
+                if body.get("code") != "AI_001":
+                    raise AssertionError(f"{label}: GEMINI_API_KEY가 없을 때 code=AI_001이어야 합니다.")
+
+        if "/openapi.json" in resp.url:
+            body = resp.json()
+            paths = body.get("paths", {})
+            if "/auth/login" in paths or "/api/v1/settings/language" in paths:
+                raise AssertionError("spring-compat 경로가 OpenAPI에 노출되어 있습니다.")
         print(f"[PASS] {label} -> {resp.status_code}")
         passed += 1
 
@@ -178,9 +150,9 @@ def run_suite(base_url: str) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Spring 호환 API 회귀 스모크 테스트")
+    parser = argparse.ArgumentParser(description="내부 연동 최소 API 회귀 스모크 테스트")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--port", type=int, default=8010)
     parser.add_argument(
         "--use-existing-server",
         action="store_true",
@@ -204,11 +176,7 @@ def main() -> int:
                     "--port",
                     str(args.port),
                 ],
-                env={
-                    **os.environ,
-                    "ENABLE_SPRING_COMPAT_ROUTER": "true",
-                    "SPRING_COMPAT_STUB_MODE": "true",
-                },
+                env={**os.environ, "ENABLE_SPRING_COMPAT_ROUTER": "false"},
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )

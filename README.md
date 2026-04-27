@@ -92,21 +92,11 @@ curl http://localhost:8000/openapi.json
 - `POST /api/v1/ai/menu-board/analyze`
 - `POST /api/v1/ai/food-images/analyze`
 
-Spring Swagger 호환 API(2차 정합):
+비활성화된 호환 라우터:
 
-- `POST /auth/login`
-- `POST /auth/refresh`
-- `POST /auth/logout`
-- `GET/PUT /api/v1/settings/allergies`
-- `GET/PATCH /api/v1/settings/language`
-- `GET/PATCH /api/v1/settings/religion`
-- `GET /api/v1/settings/options/languages`
-- `GET /api/v1/settings/options/allergies`
-- `GET /api/v1/settings/options/religions`
-- `GET /api/v1/onboarding/schools`
-- `POST /api/v1/onboarding/complete`
-- `GET /api/v1/mealcrawl/cafeterias`
-- `GET /api/v1/mealcrawl/weekly-meals`
+- `spring-compat` 라우터 코드는 유지되지만 기본 설정에서는 비활성화됩니다.
+- 활성화가 필요할 때만 `ENABLE_SPRING_COMPAT_ROUTER=true`로 실행하세요.
+- 스텁 엔드포인트까지 열어야 할 때는 `SPRING_COMPAT_STUB_MODE=true`를 함께 설정하세요.
 
 ## API 명세
 
@@ -285,30 +275,29 @@ python3 scripts/allergy_filter.py --csv menu_allergy_gemini.csv --allergens "난
 python3 -m pytest -q tests/live
 ```
 
-### API 회귀 테스트 (자동)
+### API 회귀 테스트 (자동, 내부 연동 최소 API 기준)
 
 ```bash
 python3 scripts/smoke_api_regression.py
 ```
 
-- 서버를 자동으로 기동/종료하면서 Spring 호환 핵심 API를 점검합니다.
+- 서버를 자동으로 기동/종료하면서 내부 연동용 최소 API를 점검합니다.
+- 기본 실행 포트는 `8010`이며, 실행 중인 로컬 개발 서버(`8000`)와 충돌하지 않도록 설계되어 있습니다.
 - 이미 서버가 떠 있다면 아래처럼 실행합니다.
 
 ```bash
-python3 scripts/smoke_api_regression.py --use-existing-server
+python3 scripts/smoke_api_regression.py --use-existing-server --port 8000
 ```
 
-### Postman 컬렉션
+### Postman 컬렉션(내부 연동 최소 API)
 
 - 경로: `docs/postman/ai-agent-crawler-regression.postman_collection.json`
 - 변수:
   - `baseUrl` (기본값: `http://127.0.0.1:8000`)
-  - `token` (기본값: `test-user-token`)
 - 포함 항목:
   - health 체크
-  - 인증(login)
-  - settings/onboarding/mealcrawl 핵심 엔드포인트
-  - 무인증 401 네거티브 케이스
+  - 식단 크롤링/분석/번역 엔드포인트
+  - OpenAPI에서 `spring-compat` 비노출 확인
 
 ## 운영 참고
 

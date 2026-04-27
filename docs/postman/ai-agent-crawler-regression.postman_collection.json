@@ -1,34 +1,20 @@
 {
   "info": {
-    "_postman_id": "5f85ce8f-7845-4f4b-9bb1-7f9a2134a0f1",
-    "name": "AI-Agent-Crawler Spring Compat Regression",
+    "_postman_id": "8f872f1f-bf1e-4d98-bf76-a2cb9d8e4fe5",
+    "name": "AI-Agent-Crawler Internal API Regression",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Spring Swagger 호환 엔드포인트 회귀 테스트용 컬렉션"
+    "description": "Spring Boot 내부 연동용 최소 API 회귀 테스트 컬렉션"
   },
   "item": [
     {
       "name": "Health",
       "request": {
         "method": "GET",
-        "header": [],
         "url": "{{baseUrl}}/health"
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('status is 200', function () {",
-              "  pm.response.to.have.status(200);",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ]
+      }
     },
     {
-      "name": "Auth - Login",
+      "name": "Python Meals Crawl - Invalid Range",
       "request": {
         "method": "POST",
         "header": [
@@ -39,85 +25,33 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"idToken\":\"dummy-id-token\",\"deviceId\":\"device-1\"}"
+          "raw": "{\"schoolName\":\"금오공과대학교\",\"cafeteriaName\":\"학생식당\",\"sourceUrl\":\"https://www.kumoh.ac.kr/ko/restaurant01.do\",\"startDate\":\"2026-05-01\",\"endDate\":\"2026-04-27\"}"
         },
-        "url": "{{baseUrl}}/auth/login"
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('status is 200', function () {",
-              "  pm.response.to.have.status(200);",
-              "});",
-              "const jsonData = pm.response.json();",
-              "pm.test('has access token', function () {",
-              "  pm.expect(jsonData.success).to.eql(true);",
-              "  pm.expect(jsonData.data.accessToken).to.be.a('string');",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Settings - Get Language (Auth)",
-      "request": {
-        "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}"
-          }
-        ],
-        "url": "{{baseUrl}}/api/v1/settings/language"
+        "url": "{{baseUrl}}/api/v1/python/meals/crawl"
       }
     },
     {
-      "name": "Settings - Patch Language",
-      "request": {
-        "method": "PATCH",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}"
-          },
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\"languageCode\":\"en\"}"
-        },
-        "url": "{{baseUrl}}/api/v1/settings/language"
-      }
-    },
-    {
-      "name": "Settings - Language Options",
-      "request": {
-        "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}"
-          }
-        ],
-        "url": "{{baseUrl}}/api/v1/settings/options/languages"
-      }
-    },
-    {
-      "name": "Onboarding - Complete",
+      "name": "Menus Analyze",
       "request": {
         "method": "POST",
         "header": [
           {
-            "key": "Authorization",
-            "value": "Bearer {{token}}"
-          },
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"menus\":[{\"menuId\":1,\"menuName\":\"김치찌개\"}]}"
+        },
+        "url": "{{baseUrl}}/api/v1/python/menus/analyze"
+      }
+    },
+    {
+      "name": "Menus Translate",
+      "request": {
+        "method": "POST",
+        "header": [
           {
             "key": "Content-Type",
             "value": "application/json"
@@ -125,88 +59,23 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"languageCode\":\"en\",\"schoolId\":1,\"allergyCodes\":[\"EGG\"],\"religiousCode\":\"HALAL\"}"
+          "raw": "{\"menus\":[{\"menuId\":1,\"menuName\":\"김치찌개\"}],\"targetLanguages\":[\"en\"]}"
         },
-        "url": "{{baseUrl}}/api/v1/onboarding/complete"
+        "url": "{{baseUrl}}/api/v1/python/menus/translate"
       }
     },
     {
-      "name": "Cafeterias - Get",
+      "name": "OpenAPI",
       "request": {
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}"
-          }
-        ],
-        "url": "{{baseUrl}}/api/v1/mealcrawl/cafeterias"
+        "url": "{{baseUrl}}/openapi.json"
       }
-    },
-    {
-      "name": "Weekly Meals - Get",
-      "request": {
-        "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}"
-          }
-        ],
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/mealcrawl/weekly-meals?cafeteriaId=1&weekStartDate=2026-04-27",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "mealcrawl",
-            "weekly-meals"
-          ],
-          "query": [
-            {
-              "key": "cafeteriaId",
-              "value": "1"
-            },
-            {
-              "key": "weekStartDate",
-              "value": "2026-04-27"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "name": "Negative - No Auth",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": "{{baseUrl}}/api/v1/settings/language"
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('status is 401', function () {",
-              "  pm.response.to.have.status(401);",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ]
     }
   ],
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://127.0.0.1:8000"
-    },
-    {
-      "key": "token",
-      "value": "test-user-token"
     }
   ]
 }

@@ -64,7 +64,7 @@ class ServiceConfig:
     crawl_hour: int
     crawl_minute: int
     ai_max_concurrent_tasks: int = 4
-    enable_spring_compat_router: bool = True
+    enable_spring_compat_router: bool = False
     spring_compat_stub_mode: bool = False
 
 
@@ -134,7 +134,7 @@ def load_config() -> ServiceConfig:
         crawl_hour=hour,
         crawl_minute=minute,
         ai_max_concurrent_tasks=ai_max_concurrent_tasks,
-        enable_spring_compat_router=os.environ.get("ENABLE_SPRING_COMPAT_ROUTER", "true").strip().lower() == "true",
+        enable_spring_compat_router=os.environ.get("ENABLE_SPRING_COMPAT_ROUTER", "false").strip().lower() == "true",
         spring_compat_stub_mode=os.environ.get("SPRING_COMPAT_STUB_MODE", "false").strip().lower() == "true",
     )
 
