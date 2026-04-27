@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import logging
 from datetime import datetime
 from typing import Any, Optional
@@ -42,7 +43,6 @@ from app.domain.image.agent import analyze_food_image_bytes
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
-MAX_CONCURRENT_AI_TASKS = 4
 
 
 def _validate_image_upload_or_raise(image: UploadFile, image_bytes: bytes, mime_type: str) -> None:
@@ -95,12 +95,16 @@ def create_legacy_router(ctx: RuntimeContext) -> APIRouter:
 
     @router.post("/crawl-and-forward", response_model=LegacyCrawlForwardResponse)
     def crawl_and_forward(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)) -> dict[str, Any]:
-        if cfg.spring_api_token and (credentials is None or credentials.credentials != cfg.spring_api_token):
+        if cfg.spring_api_token and (
+            credentials is None
+            or not hmac.compare_digest(credentials.credentials or "", cfg.spring_api_token)
+        ):
             raise HTTPException(status_code=401, detail="Unauthorized")
         try:
             return service.run_weekly_crawl_once()
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e)) from e
+        except Exception:
+            logger.exception("crawl-and-forward failed")
+            raise HTTPException(status_code=500, detail="Internal Server Error")
 
     @router.post("/analyze-image-and-forward", response_model=LegacyForwardResponse)
     async def analyze_image_and_forward(
@@ -172,10 +176,11 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         try:
             table = service.load_menu_table_for_source(payload.cafeteriaName, payload.sourceUrl)
         except RuntimeError as e:
-            return v1_error("PYM_400", f"요청 식단 조회 조건이 유효하지 않거나 데이터가 없습니다. (cafeteriaName={payload.cafeteriaName}, sourceUrl={payload.sourceUrl}, reason={e})", status_code=400)
+            logger.warning("crawl bad request cafeteria=%s reason=%s", payload.cafeteriaName, e)
+            return v1_error("PYM_400", "요청 식단 조회 조건이 유효하지 않거나 데이터가 없습니다.", status_code=400)
         except (CrawlSourceUpstreamError, requests.exceptions.RequestException, OSError) as e:
             logger.warning("upstream crawl source unavailable source=%s cafeteriaName=%s: %s", sanitize_url_for_log(payload.sourceUrl), payload.cafeteriaName, e)
-            return v1_error("PYM_502", f"외부 크롤링 소스 조회에 실패했습니다. 잠시 후 다시 시도해주세요. (cafeteriaName={payload.cafeteriaName}, sourceUrl={payload.sourceUrl})", status_code=502)
+            return v1_error("PYM_502", "외부 크롤링 소스 조회에 실패했습니다. 잠시 후 다시 시도해주세요.", status_code=502)
         meals = service.build_daily_meals(cafeteria_name=payload.cafeteriaName, table=table, start=payload.startDate, end=payload.endDate)
         return v1_success({"schoolName": payload.schoolName, "cafeteriaName": payload.cafeteriaName, "sourceUrl": payload.sourceUrl, "startDate": payload.startDate.isoformat(), "endDate": payload.endDate.isoformat(), "meals": meals})
 
@@ -187,7 +192,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
             return _v1_bad_request(str(e))
         if client is None:
             return v1_error("AI_001", "GEMINI_API_KEY is not set", status_code=500)
-        results = await service.analyze_menus(payload.menus, max_concurrency=MAX_CONCURRENT_AI_TASKS)
+        results = await service.analyze_menus(payload.menus, max_concurrency=cfg.ai_max_concurrent_tasks)
         return v1_success({"results": results})
 
     @router.post("/python/menus/translate", tags=["v1-translation"], operation_id="translateMenusV1", response_model=ApiSuccessResponse[PythonMenuTranslationDataResponse], responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}})
@@ -198,7 +203,11 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
             return _v1_bad_request(str(e))
         if client is None:
             return v1_error("AI_001", "GEMINI_API_KEY is not set", status_code=500)
-        results = await service.translate_menus(payload.menus, target_languages=payload.targetLanguages, max_concurrency=MAX_CONCURRENT_AI_TASKS)
+        results = await service.translate_menus(
+            payload.menus,
+            target_languages=payload.targetLanguages,
+            max_concurrency=cfg.ai_max_concurrent_tasks,
+        )
         return v1_success({"results": results})
 
     @router.post("/translations", tags=["v1-translation"], operation_id="freeTranslationV1", response_model=ApiSuccessResponse[FreeTranslationDataResponse], responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}})

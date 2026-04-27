@@ -16,6 +16,10 @@ from app.repository.crawl_repository import CrawlRepository
 from app.repository.spring_repository import SpringRepository
 
 logger = logging.getLogger(__name__)
+BASE_INGREDIENT_CONFIDENCE = 0.95
+INGREDIENT_CONFIDENCE_DECAY = 0.07
+MIN_INGREDIENT_CONFIDENCE = 0.5
+ALLERGEN_FALLBACK_CONFIDENCE = 0.8
 
 
 class LiveService:
@@ -118,7 +122,13 @@ class LiveService:
                     ingredient_codes.append(
                         {
                             "ingredientCode": code,
-                            "confidence": round(max(0.5, 0.95 - (idx * 0.07)), 2),
+                            "confidence": round(
+                                max(
+                                    MIN_INGREDIENT_CONFIDENCE,
+                                    BASE_INGREDIENT_CONFIDENCE - (idx * INGREDIENT_CONFIDENCE_DECAY),
+                                ),
+                                2,
+                            ),
                         }
                     )
                 for allergen in analysis.get("allergensKo") or []:
@@ -128,7 +138,9 @@ class LiveService:
                     if not code or code in dedup:
                         continue
                     dedup.add(code)
-                    ingredient_codes.append({"ingredientCode": code, "confidence": 0.8})
+                    ingredient_codes.append(
+                        {"ingredientCode": code, "confidence": ALLERGEN_FALLBACK_CONFIDENCE}
+                    )
                 return {
                     "menuId": target.menuId,
                     "menuName": target.menuName,

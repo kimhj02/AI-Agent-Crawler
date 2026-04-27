@@ -63,6 +63,9 @@ class ServiceConfig:
     crawl_weekday: int
     crawl_hour: int
     crawl_minute: int
+    ai_max_concurrent_tasks: int = 4
+    enable_spring_compat_router: bool = True
+    spring_compat_stub_mode: bool = False
 
 
 @dataclass
@@ -106,6 +109,13 @@ def load_config() -> ServiceConfig:
     enable_direct_image_analysis = (
         os.environ.get("ENABLE_DIRECT_IMAGE_ANALYSIS", "false").strip().lower() == "true"
     )
+    raw_ai_concurrency = os.environ.get("AI_MAX_CONCURRENT_TASKS", "4")
+    try:
+        ai_max_concurrent_tasks = int(raw_ai_concurrency)
+    except ValueError as e:
+        raise RuntimeError("AI_MAX_CONCURRENT_TASKS must be an integer >= 1") from e
+    if ai_max_concurrent_tasks < 1:
+        raise RuntimeError("AI_MAX_CONCURRENT_TASKS must be >= 1")
     return ServiceConfig(
         spring_menus_url=os.environ.get("SPRING_MENUS_URL", "").strip() or None,
         spring_image_analysis_url=os.environ.get("SPRING_IMAGE_ANALYSIS_URL", "").strip() or None,
@@ -123,6 +133,9 @@ def load_config() -> ServiceConfig:
         crawl_weekday=WEEKDAY_TO_INDEX[weekday_text],
         crawl_hour=hour,
         crawl_minute=minute,
+        ai_max_concurrent_tasks=ai_max_concurrent_tasks,
+        enable_spring_compat_router=os.environ.get("ENABLE_SPRING_COMPAT_ROUTER", "true").strip().lower() == "true",
+        spring_compat_stub_mode=os.environ.get("SPRING_COMPAT_STUB_MODE", "false").strip().lower() == "true",
     )
 
 

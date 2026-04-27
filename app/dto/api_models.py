@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Generic, Literal, Optional, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 T = TypeVar("T")
 
@@ -16,6 +16,12 @@ class PythonMealCrawlRequest(BaseModel):
     sourceUrl: str = Field(..., min_length=1)
     startDate: date
     endDate: date
+
+    @model_validator(mode="after")
+    def validate_date_range(self):
+        if self.startDate > self.endDate:
+            raise ValueError("startDate는 endDate보다 이후일 수 없습니다.")
+        return self
 
 
 class PythonMenuAnalysisTargetDto(BaseModel):
@@ -186,7 +192,7 @@ class UpdateLanguageRequest(BaseModel):
 
 
 class UpdateReligionRequest(BaseModel):
-    religiousCode: Optional[str] = None
+    religiousCode: Optional[Literal["HALAL", "VEGAN"]] = None
 
 
 class CompleteOnboardingRequest(BaseModel):
@@ -234,7 +240,7 @@ class AllergyOptionItemResponse(BaseModel):
 
 
 class ReligionOptionItemResponse(BaseModel):
-    religiousCode: Literal["HALAL", "VEGAN", "NONE"] = Field(..., examples=["HALAL"])
+    religiousCode: Literal["HALAL", "VEGAN"] = Field(..., examples=["HALAL"])
     religiousName: str = Field(..., examples=["Halal"])
 
 

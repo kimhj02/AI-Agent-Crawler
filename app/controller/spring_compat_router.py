@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any, Optional
 
+import requests
 from fastapi import APIRouter, Query, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -32,7 +33,7 @@ from app.dto.api_models import (
     WeeklyMealsDataResponse,
 )
 from app.service.live_service import LiveService
-from app.util.service_ops import v1_error, v1_success
+from app.util.service_ops import CrawlSourceUpstreamError, v1_error, v1_success
 
 security = HTTPBearer(auto_error=False)
 
@@ -59,12 +60,11 @@ ALLERGY_OPTIONS = [
 RELIGION_OPTIONS = [
     {"religiousCode": "HALAL", "religiousName": "Halal"},
     {"religiousCode": "VEGAN", "religiousName": "Vegan"},
-    {"religiousCode": "NONE", "religiousName": "None"},
 ]
 SCHOOLS = [{"schoolId": 1, "schoolName": "금오공과대학교"}]
 VALID_LANGS = {x["languageCode"] for x in LANGUAGE_OPTIONS}
 VALID_ALLERGIES = {x["allergyCode"] for x in ALLERGY_OPTIONS}
-VALID_RELIGIONS = {x["religiousCode"] for x in RELIGION_OPTIONS if x["religiousCode"] != "NONE"}
+VALID_RELIGIONS = {x["religiousCode"] for x in RELIGION_OPTIONS}
 
 _USER_SETTINGS: dict[str, dict[str, Any]] = {}
 
@@ -93,6 +93,19 @@ def _require_user(credentials: Optional[HTTPAuthorizationCredentials]):
 
 
 def create_spring_compat_router(ctx: RuntimeContext) -> APIRouter:
+    if not ctx.config.spring_compat_stub_mode:
+        router = APIRouter(tags=["spring-compat"])
+
+        @router.get("/spring-compat-disabled", summary="Spring 호환 스텁 비활성화 안내")
+        def spring_compat_disabled():
+            return v1_error(
+                "COM_003",
+                "SPRING_COMPAT_STUB_MODE=true 일 때만 Spring 호환 스텁 API를 사용할 수 있습니다.",
+                status_code=503,
+            )
+
+        return router
+
     service = LiveService(ctx)
     router = APIRouter(tags=["spring-compat"])
 
@@ -341,12 +354,21 @@ def create_spring_compat_router(ctx: RuntimeContext) -> APIRouter:
         state, err = _require_user(credentials)
         if err:
             return err
-        if cafeteriaId not in {1, 2, 3}:
+        cafeteria_name = next(
+            (c["cafeteriaName"] for c in DEFAULT_CAFETERIAS if c["cafeteriaId"] == cafeteriaId),
+            None,
+        )
+        if cafeteria_name is None:
             return v1_error("COM_002", "요청 데이터 변환 과정에서 오류가 발생했습니다.", status_code=400)
-        table = service.load_menu_table_for_source("학생식당", DEFAULT_SOURCE_URL)
+        try:
+            table = service.load_menu_table_for_source(cafeteria_name, DEFAULT_SOURCE_URL)
+        except RuntimeError:
+            return v1_error("PYM_400", "요청 식단 조회 조건이 유효하지 않거나 데이터가 없습니다.", status_code=400)
+        except (CrawlSourceUpstreamError, requests.exceptions.RequestException, OSError):
+            return v1_error("PYM_502", "외부 크롤링 소스 조회에 실패했습니다. 잠시 후 다시 시도해주세요.", status_code=502)
         week_end = weekStartDate + timedelta(days=6)
         meals = service.build_daily_meals(
-            cafeteria_name="학생식당",
+            cafeteria_name=cafeteria_name,
             table=table,
             start=weekStartDate,
             end=week_end,

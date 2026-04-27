@@ -4,19 +4,19 @@
 
 ## 계층 가이드
 
-- `app/controllers`
+- `app/controller`
   - FastAPI 라우터와 HTTP 입출력 처리
   - 요청 검증, 서비스 호출, 응답 변환
-- `app/services`
+- `app/service`
   - 유스케이스 오케스트레이션
   - 라우터의 비즈니스 루프/동시성 처리 담당
-- `app/repositories`
+- `app/repository`
   - 외부 I/O (Spring HTTP, 크롤링 소스, Gemini 호출)
 - `app/domain`
   - 순수 도메인 모델 및 정책
 - `app/dto`
   - 요청/응답 스키마 모델
-- `app/bootstrap`
+- `app/config`
   - 런타임 설정 및 앱 팩토리
 
 ## 호환성 정책

@@ -66,6 +66,7 @@ def create_app(ctx: RuntimeContext) -> FastAPI:
             {"name": "v1-meals", "description": "식단 크롤링/조회 관련 API"},
             {"name": "v1-ai", "description": "AI 분석/이미지 분석 API"},
             {"name": "v1-translation", "description": "번역 API"},
+            {"name": "spring-compat", "description": "Spring Swagger 호환(스텁) 엔드포인트"},
         ],
     )
 
@@ -81,5 +82,6 @@ def create_app(ctx: RuntimeContext) -> FastAPI:
 
     app.include_router(create_legacy_router(ctx))
     app.include_router(create_v1_router(ctx))
-    app.include_router(create_spring_compat_router(ctx))
+    if ctx.config.enable_spring_compat_router:
+        app.include_router(create_spring_compat_router(ctx))
     return app

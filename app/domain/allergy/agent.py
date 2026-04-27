@@ -71,7 +71,9 @@ def analyze_menus_with_gemini(
                 last_err = e
                 time.sleep(sleep_between_batches_sec * (attempt + 1))
         if resp is None:
-            raise last_err  # type: ignore[misc]
+            if last_err is not None:
+                raise last_err
+            raise RuntimeError("Gemini 호출 재시도 횟수가 0이거나 응답 생성에 실패했습니다.")
         raw = (getattr(resp, "text", "") or "").strip()
         if not raw:
             raise RuntimeError("Gemini 응답이 비었습니다.")
