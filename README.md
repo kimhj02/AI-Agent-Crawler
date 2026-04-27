@@ -92,6 +92,22 @@ curl http://localhost:8000/openapi.json
 - `POST /api/v1/ai/menu-board/analyze`
 - `POST /api/v1/ai/food-images/analyze`
 
+Spring Swagger 호환 API(2차 정합):
+
+- `POST /auth/login`
+- `POST /auth/refresh`
+- `POST /auth/logout`
+- `GET/PUT /api/v1/settings/allergies`
+- `GET/PATCH /api/v1/settings/language`
+- `GET/PATCH /api/v1/settings/religion`
+- `GET /api/v1/settings/options/languages`
+- `GET /api/v1/settings/options/allergies`
+- `GET /api/v1/settings/options/religions`
+- `GET /api/v1/onboarding/schools`
+- `POST /api/v1/onboarding/complete`
+- `GET /api/v1/mealcrawl/cafeterias`
+- `GET /api/v1/mealcrawl/weekly-meals`
+
 ## API 명세
 
 ### 1) `POST /api/v1/python/meals/crawl`
@@ -288,6 +304,11 @@ python3 scripts/smoke_api_regression.py --use-existing-server
 - 변수:
   - `baseUrl` (기본값: `http://127.0.0.1:8000`)
   - `token` (기본값: `test-user-token`)
+- 포함 항목:
+  - health 체크
+  - 인증(login)
+  - settings/onboarding/mealcrawl 핵심 엔드포인트
+  - 무인증 401 네거티브 케이스
 
 ## 운영 참고
 
