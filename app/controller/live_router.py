@@ -31,6 +31,22 @@ from app.dto.api_models import (
     PythonMenuTranslationDataResponse,
     PythonMenuTranslationRequest,
 )
+from app.dto.openapi_examples import (
+    AI_KEY_MISSING_EXAMPLE,
+    BAD_REQUEST_COM001_EXAMPLE,
+    FOOD_IMAGE_ANALYZE_RESPONSE_EXAMPLE,
+    FREE_TRANSLATION_REQUEST_OPENAPI_EXAMPLES,
+    FREE_TRANSLATION_SUCCESS_EXAMPLE,
+    MEAL_CRAWL_ERROR_UPSTREAM_EXAMPLE,
+    MEAL_CRAWL_REQUEST_OPENAPI_EXAMPLES,
+    MEAL_CRAWL_SUCCESS_EXAMPLE,
+    MENU_ANALYZE_REQUEST_OPENAPI_EXAMPLES,
+    MENU_ANALYZE_SUCCESS_EXAMPLE,
+    MENU_BOARD_ANALYZE_RESPONSE_EXAMPLE,
+    MENU_TRANSLATE_REQUEST_OPENAPI_EXAMPLES,
+    MENU_TRANSLATE_SUCCESS_EXAMPLE,
+    VALIDATION_ERROR_EXAMPLE,
+)
 from app.service.live_service import LiveService
 from app.util.service_ops import (
     CrawlSourceUpstreamError,
@@ -192,9 +208,55 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         description="학교/식당/기간 조건으로 식단을 조회하고 메뉴 목록을 표준 DTO로 반환합니다.",
         operation_id="crawlMealsV1",
         response_model=ApiSuccessResponse[PythonMealCrawlDataResponse],
-        responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}},
+        responses={
+            200: {
+                "description": "조회 성공",
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "식단포함": {
+                                "summary": "meals에 일자별 메뉴 포함",
+                                "value": MEAL_CRAWL_SUCCESS_EXAMPLE,
+                            }
+                        }
+                    }
+                },
+            },
+            400: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "검증실패": {"summary": "스키마/헤더 검증 오류", "value": VALIDATION_ERROR_EXAMPLE},
+                            "조건불가": {
+                                "summary": "식당/URL 조건 오류",
+                                "value": {
+                                    "success": False,
+                                    "code": "PYM_400",
+                                    "msg": "요청 식단 조회 조건이 유효하지 않거나 데이터가 없습니다.",
+                                },
+                            },
+                        }
+                    }
+                },
+            },
+            502: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "업스트림실패": {"summary": "외부 크롤 소스 실패", "value": MEAL_CRAWL_ERROR_UPSTREAM_EXAMPLE},
+                        }
+                    }
+                },
+            },
+            500: {"model": ApiErrorResponse},
+        },
     )
-    def crawl_meals_v1(payload: PythonMealCrawlRequest, request: Request):
+    def crawl_meals_v1(
+        request: Request,
+        payload: PythonMealCrawlRequest = Body(..., openapi_examples=MEAL_CRAWL_REQUEST_OPENAPI_EXAMPLES),
+    ):
         try:
             validate_accept_language(request.headers.get("Accept-Language"))
         except ValueError as e:
@@ -219,9 +281,43 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         description="메뉴명 리스트를 받아 재료 코드/신뢰도 추정 결과를 반환합니다.",
         operation_id="analyzeMenusV1",
         response_model=ApiSuccessResponse[PythonMenuAnalysisDataResponse],
-        responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}},
+        responses={
+            200: {
+                "description": "분석 성공",
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "재료추정": {"summary": "ingredients 포함", "value": MENU_ANALYZE_SUCCESS_EXAMPLE},
+                        }
+                    }
+                },
+            },
+            400: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "검증실패": {"value": VALIDATION_ERROR_EXAMPLE},
+                        }
+                    }
+                },
+            },
+            500: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "키미설정": {"summary": "GEMINI 미설정", "value": AI_KEY_MISSING_EXAMPLE},
+                        }
+                    }
+                },
+            },
+        },
     )
-    async def analyze_menus_v1(payload: PythonMenuAnalysisRequest, request: Request):
+    async def analyze_menus_v1(
+        request: Request,
+        payload: PythonMenuAnalysisRequest = Body(..., openapi_examples=MENU_ANALYZE_REQUEST_OPENAPI_EXAMPLES),
+    ):
         try:
             validate_accept_language(request.headers.get("Accept-Language"))
         except ValueError as e:
@@ -238,9 +334,43 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         description="메뉴명 리스트를 요청 언어 목록으로 번역해 반환합니다.",
         operation_id="translateMenusV1",
         response_model=ApiSuccessResponse[PythonMenuTranslationDataResponse],
-        responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}},
+        responses={
+            200: {
+                "description": "번역 성공",
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "다국어": {"summary": "translations 배열", "value": MENU_TRANSLATE_SUCCESS_EXAMPLE},
+                        }
+                    }
+                },
+            },
+            400: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "검증실패": {"value": VALIDATION_ERROR_EXAMPLE},
+                        }
+                    }
+                },
+            },
+            500: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "키미설정": {"value": AI_KEY_MISSING_EXAMPLE},
+                        }
+                    }
+                },
+            },
+        },
     )
-    async def translate_menus_v1(payload: PythonMenuTranslationRequest, request: Request):
+    async def translate_menus_v1(
+        request: Request,
+        payload: PythonMenuTranslationRequest = Body(..., openapi_examples=MENU_TRANSLATE_REQUEST_OPENAPI_EXAMPLES),
+    ):
         try:
             validate_accept_language(request.headers.get("Accept-Language"))
         except ValueError as e:
@@ -261,9 +391,34 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         description="sourceLang/targetLang 기준으로 일반 텍스트를 번역합니다.",
         operation_id="freeTranslationV1",
         response_model=ApiSuccessResponse[FreeTranslationDataResponse],
-        responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}},
+        responses={
+            200: {
+                "description": "번역 성공",
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "문장번역": {"value": FREE_TRANSLATION_SUCCESS_EXAMPLE},
+                        }
+                    }
+                },
+            },
+            400: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "검증실패": {"value": VALIDATION_ERROR_EXAMPLE},
+                        }
+                    }
+                },
+            },
+            500: {"model": ApiErrorResponse},
+        },
     )
-    async def free_translation_v1(payload: FreeTranslationRequest, request: Request):
+    async def free_translation_v1(
+        request: Request,
+        payload: FreeTranslationRequest = Body(..., openapi_examples=FREE_TRANSLATION_REQUEST_OPENAPI_EXAMPLES),
+    ):
         try:
             validate_accept_language(request.headers.get("Accept-Language"))
         except ValueError as e:
@@ -275,10 +430,42 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         "/ai/menu-board/analyze",
         tags=["v1-ai"],
         summary="메뉴판 이미지 인식",
-        description="메뉴판 사진에서 음식명을 인식해 후보 메뉴를 반환합니다.",
+        description="메뉴판 사진에서 음식명을 인식해 후보 메뉴를 반환합니다. `multipart/form-data`로 `image`(필수), `requestId`(선택)를 전송합니다.",
         operation_id="analyzeMenuBoardV1",
         response_model=ApiSuccessResponse[MenuBoardAnalyzeDataResponse],
-        responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}},
+        responses={
+            200: {
+                "description": "인식 성공",
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "메뉴후보": {"value": MENU_BOARD_ANALYZE_RESPONSE_EXAMPLE},
+                        }
+                    }
+                },
+            },
+            400: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "이미지검증": {"value": BAD_REQUEST_COM001_EXAMPLE},
+                            "검증실패": {"value": VALIDATION_ERROR_EXAMPLE},
+                        }
+                    }
+                },
+            },
+            500: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "키미설정": {"value": AI_KEY_MISSING_EXAMPLE},
+                        }
+                    }
+                },
+            },
+        },
     )
     async def analyze_menu_board_v1(request: Request, image: UploadFile = File(...), requestId: Optional[str] = Form(default=None)):
         try:
@@ -299,10 +486,42 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
         "/ai/food-images/analyze",
         tags=["v1-ai"],
         summary="음식 이미지 재료/알레르기 분석",
-        description="음식 사진을 분석해 재료 코드와 알레르기 가능 항목을 반환합니다.",
+        description="음식 사진을 분석해 재료 코드와 알레르기 가능 항목을 반환합니다. `multipart/form-data`로 `image`(필수), `requestId`(선택)를 전송합니다.",
         operation_id="analyzeFoodImageV1",
         response_model=ApiSuccessResponse[FoodImageAnalyzeDataResponse],
-        responses={400: {"model": ApiErrorResponse}, 500: {"model": ApiErrorResponse}},
+        responses={
+            200: {
+                "description": "분석 성공",
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "재료추정": {"value": FOOD_IMAGE_ANALYZE_RESPONSE_EXAMPLE},
+                        }
+                    }
+                },
+            },
+            400: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "이미지검증": {"value": BAD_REQUEST_COM001_EXAMPLE},
+                            "검증실패": {"value": VALIDATION_ERROR_EXAMPLE},
+                        }
+                    }
+                },
+            },
+            500: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "키미설정": {"value": AI_KEY_MISSING_EXAMPLE},
+                        }
+                    }
+                },
+            },
+        },
     )
     async def analyze_food_image_v1(request: Request, image: UploadFile = File(...), requestId: Optional[str] = Form(default=None)):
         try:

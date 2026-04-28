@@ -104,20 +104,36 @@ curl http://localhost:8000/openapi.json
 
 - 용도: 학교/식당/기간 기준으로 식단 크롤링
 - 요청 `Content-Type`: `application/json`
+- 권장 헤더: `Accept-Language: ko`
 
-요청 예시:
+요청 예시 (`curl`):
+
+```bash
+curl -sS -X POST "http://localhost:8000/api/v1/python/meals/crawl" \
+  -H "Content-Type: application/json" \
+  -H "Accept-Language: ko" \
+  -d '{
+    "schoolName": "금오공과대학교",
+    "cafeteriaName": "학생식당",
+    "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
+    "startDate": "2026-04-21",
+    "endDate": "2026-04-27"
+  }'
+```
+
+요청 본문 예시:
 
 ```json
 {
   "schoolName": "금오공과대학교",
   "cafeteriaName": "학생식당",
   "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
-  "startDate": "2026-04-15",
-  "endDate": "2026-04-21"
+  "startDate": "2026-04-21",
+  "endDate": "2026-04-27"
 }
 ```
 
-성공 예시:
+성공 응답 예시 (`meals`는 일자·끼니별로 채워질 수 있음):
 
 ```json
 {
@@ -126,10 +142,39 @@ curl http://localhost:8000/openapi.json
     "schoolName": "금오공과대학교",
     "cafeteriaName": "학생식당",
     "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
-    "startDate": "2026-04-15",
-    "endDate": "2026-04-21",
-    "meals": []
+    "startDate": "2026-04-21",
+    "endDate": "2026-04-27",
+    "meals": [
+      {
+        "mealDate": "2026-04-21",
+        "mealType": "LUNCH",
+        "menus": [
+          {"cornerName": "학생식당", "displayOrder": 1, "menuName": "김치찌개"},
+          {"cornerName": "학생식당", "displayOrder": 2, "menuName": "된장찌개"}
+        ]
+      }
+    ]
   }
+}
+```
+
+실패 응답 예시 (외부 소스 조회 실패, HTTP 502):
+
+```json
+{
+  "success": false,
+  "code": "PYM_502",
+  "msg": "외부 크롤링 소스 조회에 실패했습니다. 잠시 후 다시 시도해주세요."
+}
+```
+
+실패 응답 예시 (조건 불가, HTTP 400):
+
+```json
+{
+  "success": false,
+  "code": "PYM_400",
+  "msg": "요청 식단 조회 조건이 유효하지 않거나 데이터가 없습니다."
 }
 ```
 
@@ -138,8 +183,18 @@ curl http://localhost:8000/openapi.json
 ### 2) `POST /api/v1/python/menus/analyze`
 
 - 용도: 메뉴 텍스트를 AI로 분석해 재료 코드 추정
+- 요청 `Content-Type`: `application/json`
 
-요청 예시:
+요청 예시 (`curl`):
+
+```bash
+curl -sS -X POST "http://localhost:8000/api/v1/python/menus/analyze" \
+  -H "Content-Type: application/json" \
+  -H "Accept-Language: ko" \
+  -d '{"menus":[{"menuId":101,"menuName":"김치찌개"}]}'
+```
+
+요청 본문 예시:
 
 ```json
 {
@@ -149,13 +204,58 @@ curl http://localhost:8000/openapi.json
 }
 ```
 
+성공 응답 예시:
+
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "menuId": 101,
+        "menuName": "김치찌개",
+        "status": "COMPLETED",
+        "reason": null,
+        "modelName": "gemini",
+        "modelVersion": "gemini-2.5-flash",
+        "analyzedAt": "2026-04-27T12:00:00",
+        "ingredients": [
+          {"ingredientCode": "SOYBEAN", "confidence": 0.88},
+          {"ingredientCode": "WHEAT", "confidence": 0.81}
+        ]
+      }
+    ]
+  }
+}
+```
+
+실패 응답 예시 (`GEMINI_API_KEY` 미설정, HTTP 500):
+
+```json
+{
+  "success": false,
+  "code": "AI_001",
+  "msg": "GEMINI_API_KEY is not set"
+}
+```
+
 주요 실패 코드: `COM_002`, `AI_001`
 
 ### 3) `POST /api/v1/python/menus/translate`
 
 - 용도: 메뉴명을 다국어로 번역
+- 요청 `Content-Type`: `application/json`
 
-요청 예시:
+요청 예시 (`curl`):
+
+```bash
+curl -sS -X POST "http://localhost:8000/api/v1/python/menus/translate" \
+  -H "Content-Type: application/json" \
+  -H "Accept-Language: ko" \
+  -d '{"menus":[{"menuId":101,"menuName":"김치찌개"}],"targetLanguages":["en","ja"]}'
+```
+
+요청 본문 예시:
 
 ```json
 {
@@ -166,19 +266,74 @@ curl http://localhost:8000/openapi.json
 }
 ```
 
+성공 응답 예시:
+
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "menuId": 101,
+        "sourceName": "김치찌개",
+        "translations": [
+          {"langCode": "en", "translatedName": "Kimchi stew"},
+          {"langCode": "ja", "translatedName": "キムチチゲ"}
+        ],
+        "translationErrors": []
+      }
+    ]
+  }
+}
+```
+
+실패 응답 예시 (`GEMINI_API_KEY` 미설정, HTTP 500):
+
+```json
+{
+  "success": false,
+  "code": "AI_001",
+  "msg": "GEMINI_API_KEY is not set"
+}
+```
+
 주요 실패 코드: `COM_002`, `AI_001`
 
 ### 4) `POST /api/v1/translations`
 
 - 용도: 자유 문장 번역
+- 요청 `Content-Type`: `application/json`
 
-요청 예시:
+요청 예시 (`curl`):
+
+```bash
+curl -sS -X POST "http://localhost:8000/api/v1/translations" \
+  -H "Content-Type: application/json" \
+  -H "Accept-Language: ko" \
+  -d '{"sourceLang":"ko","targetLang":"en","text":"이 음식에 밀가루가 들어가나요?"}'
+```
+
+요청 본문 예시:
 
 ```json
 {
   "sourceLang": "ko",
   "targetLang": "en",
   "text": "이 음식에 밀가루가 들어가나요?"
+}
+```
+
+성공 응답 예시:
+
+```json
+{
+  "success": true,
+  "data": {
+    "sourceLang": "ko",
+    "targetLang": "en",
+    "text": "이 음식에 밀가루가 들어가나요?",
+    "translatedText": "Does this dish contain flour?"
+  }
 }
 ```
 
@@ -192,6 +347,39 @@ curl http://localhost:8000/openapi.json
   - `image`: 이미지 파일
   - `requestId`: 선택
 
+요청 예시 (`curl`, 로컬 이미지 경로는 환경에 맞게 변경):
+
+```bash
+curl -sS -X POST "http://localhost:8000/api/v1/ai/menu-board/analyze" \
+  -H "Accept-Language: ko" \
+  -F "image=@./sample-menu-board.jpg" \
+  -F "requestId=req-001"
+```
+
+성공 응답 예시:
+
+```json
+{
+  "success": true,
+  "data": {
+    "requestId": "req-001",
+    "recognizedMenus": [
+      {"menuName": "김치찌개", "confidence": 0.82}
+    ]
+  }
+}
+```
+
+실패 응답 예시 (빈 파일 등, HTTP 400):
+
+```json
+{
+  "success": false,
+  "code": "COM_001",
+  "msg": "이미지 파일이 비어 있습니다."
+}
+```
+
 주요 실패 코드: `COM_001`, `AI_001`, `AI_003`
 
 ### 6) `POST /api/v1/ai/food-images/analyze`
@@ -201,6 +389,42 @@ curl http://localhost:8000/openapi.json
 - 폼 필드:
   - `image`: 이미지 파일
   - `requestId`: 선택
+
+요청 예시 (`curl`):
+
+```bash
+curl -sS -X POST "http://localhost:8000/api/v1/ai/food-images/analyze" \
+  -H "Accept-Language: ko" \
+  -F "image=@./sample-food.jpg" \
+  -F "requestId=req-002"
+```
+
+성공 응답 예시:
+
+```json
+{
+  "success": true,
+  "data": {
+    "requestId": "req-002",
+    "foodName": "김치찌개",
+    "ingredients": [
+      {"ingredientCode": "SOYBEAN", "confidence": 0.9},
+      {"ingredientCode": "WHEAT", "confidence": 0.75}
+    ],
+    "notes": "추정 결과이며 실제와 다를 수 있습니다."
+  }
+}
+```
+
+실패 응답 예시 (빈 파일 등, HTTP 400):
+
+```json
+{
+  "success": false,
+  "code": "COM_001",
+  "msg": "이미지 파일이 비어 있습니다."
+}
+```
 
 주요 실패 코드: `COM_001`, `AI_001`, `AI_003`
 
@@ -230,6 +454,8 @@ open http://localhost:8000/docs
 ```bash
 curl http://localhost:8000/openapi.json
 ```
+
+`/api/v1` JSON 엔드포인트에는 **요청 본문 예시**가 등록되어 있고, 각 작업의 **응답(200·400·500 등) 예시**도 OpenAPI에 포함되어 있습니다. Swagger UI에서 `Try it out` 시 본문 드롭다운으로 예시를 고를 수 있으며, 응답 섹션에서 상태 코드별 예시를 확인할 수 있습니다.
 
 ### 3) 엔드포인트 테스트 절차
 
