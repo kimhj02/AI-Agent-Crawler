@@ -44,6 +44,19 @@ MEAL_CRAWL_ERROR_UPSTREAM_EXAMPLE: dict = {
     "msg": "외부 크롤링 소스 조회에 실패했습니다. 잠시 후 다시 시도해주세요.",
 }
 
+MEAL_CRAWL_ERROR_BAD_CONDITION_EXAMPLE: dict = {
+    "success": False,
+    "code": "PYM_400",
+    "msg": "요청 식단 조회 조건이 유효하지 않거나 데이터가 없습니다.",
+}
+
+# 식단 크롤 등에서 처리 중 예기치 않은 오류 시(문서용 예시; README PYM_500과 정합)
+V1_INTERNAL_SERVER_ERROR_EXAMPLE: dict = {
+    "success": False,
+    "code": "PYM_500",
+    "msg": "식단 조회 처리 중 서버 오류가 발생했습니다.",
+}
+
 # --- POST /api/v1/python/menus/analyze ---
 MENU_ANALYZE_REQUEST_OPENAPI_EXAMPLES: dict = {
     "기본": {

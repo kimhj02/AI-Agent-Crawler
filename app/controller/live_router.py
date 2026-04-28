@@ -37,6 +37,7 @@ from app.dto.openapi_examples import (
     FOOD_IMAGE_ANALYZE_RESPONSE_EXAMPLE,
     FREE_TRANSLATION_REQUEST_OPENAPI_EXAMPLES,
     FREE_TRANSLATION_SUCCESS_EXAMPLE,
+    MEAL_CRAWL_ERROR_BAD_CONDITION_EXAMPLE,
     MEAL_CRAWL_ERROR_UPSTREAM_EXAMPLE,
     MEAL_CRAWL_REQUEST_OPENAPI_EXAMPLES,
     MEAL_CRAWL_SUCCESS_EXAMPLE,
@@ -46,6 +47,7 @@ from app.dto.openapi_examples import (
     MENU_TRANSLATE_REQUEST_OPENAPI_EXAMPLES,
     MENU_TRANSLATE_SUCCESS_EXAMPLE,
     VALIDATION_ERROR_EXAMPLE,
+    V1_INTERNAL_SERVER_ERROR_EXAMPLE,
 )
 from app.service.live_service import LiveService
 from app.util.service_ops import (
@@ -230,11 +232,7 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
                             "검증실패": {"summary": "스키마/헤더 검증 오류", "value": VALIDATION_ERROR_EXAMPLE},
                             "조건불가": {
                                 "summary": "식당/URL 조건 오류",
-                                "value": {
-                                    "success": False,
-                                    "code": "PYM_400",
-                                    "msg": "요청 식단 조회 조건이 유효하지 않거나 데이터가 없습니다.",
-                                },
+                                "value": MEAL_CRAWL_ERROR_BAD_CONDITION_EXAMPLE,
                             },
                         }
                     }
@@ -250,7 +248,19 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
                     }
                 },
             },
-            500: {"model": ApiErrorResponse},
+            500: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "서버오류": {
+                                "summary": "처리 중 내부 오류(문서 예시)",
+                                "value": V1_INTERNAL_SERVER_ERROR_EXAMPLE,
+                            },
+                        }
+                    }
+                },
+            },
         },
     )
     def crawl_meals_v1(
@@ -412,7 +422,16 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
                     }
                 },
             },
-            500: {"model": ApiErrorResponse},
+            500: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "키미설정": {"summary": "GEMINI 미설정", "value": AI_KEY_MISSING_EXAMPLE},
+                        }
+                    }
+                },
+            },
         },
     )
     async def free_translation_v1(
@@ -423,6 +442,8 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
             validate_accept_language(request.headers.get("Accept-Language"))
         except ValueError as e:
             return _v1_bad_request(str(e))
+        if client is None:
+            return v1_error("AI_001", "GEMINI_API_KEY is not set", status_code=500)
         translated = await asyncio.to_thread(service.translate_text, payload.sourceLang, payload.targetLang, payload.text)
         return v1_success({"sourceLang": payload.sourceLang, "targetLang": payload.targetLang, "text": payload.text, "translatedText": translated})
 
