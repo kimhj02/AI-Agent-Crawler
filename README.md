@@ -131,8 +131,10 @@ API 문서: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) · OpenAPI 
 
 ```bash
 python3 scripts/verify_spring_python_integration.py
+# 고정 포트가 필요하면: python3 scripts/verify_spring_python_integration.py --port 8890
 ```
 
+- 기본은 **`--port 0`**(미지정과 동일)으로 **빈 포트를 자동 선택**해 Uvicorn을 띄웁니다.
 - `RestClient` 와 동일한 방식으로 **`POST /api/v1/crawl/meals`** 를 호출해 비래핑 응답을 검사합니다.
 - 로컬 모의 HTTP 서버로 **`SpringRepository.post_json`** 전달 경로를 검사합니다.
 
@@ -171,7 +173,7 @@ cd ../Backend && bash ./mvnw test -Dtest=PythonMealClientAdapterTest
 | `WEEKLY_MENU_SLEEP_SECONDS` | `21.0` | 실수 ≥ 0 (배치 사이 대기) |
 | `I18N_LOCALE` | `en` | 주간 페이로드 요약 로케일 |
 | `ENABLE_DIRECT_IMAGE_ANALYSIS` | `false` | `true` 일 때만 **`/analyze-image-and-forward`** 허용 |
-| `AI_MAX_CONCURRENT_TASKS` | `4` | 정수 ≥ 1. **래핑 API** 메뉴 분석·번역 동시성 |
+| `AI_MAX_CONCURRENT_TASKS` | `4` | 정수 ≥ 1. **`/api/v1/python/menus/*` 와 Spring-native `/api/v1/menus/*`** 메뉴 분석·번역 동시성 |
 | `CRAWL_SOURCE_ALLOWLIST` | 없음(제한 없음) | 쉼표 구분 호스트. **설정 시** 해당 호스트만 크롤 허용 (`app/services/ops.py`) |
 
 **`POST /api/v1/crawl/meals` 등 Spring-native 크롤**은 외부 급식 페이지만 보면 되므로 **`GEMINI_API_KEY` 없이도** 동작할 수 있습니다(금오 URL 등). 반면 **`/api/v1/menus/analyze`**, **`translate`**, **`/api/v1/python/...` AI 계열**, **주간 `crawl-and-forward`** 는 키가 필요합니다.

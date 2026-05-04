@@ -12,6 +12,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 import repo_env
+
+repo_env.load_dotenv_from_repo_root()
+
 from app.config.app_factory import create_app
 from app.config.runtime import load_runtime_context
 
@@ -23,8 +26,8 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def client() -> TestClient:
-    repo_env.load_dotenv_from_repo_root()
-    return TestClient(create_app(load_runtime_context()))
+    with TestClient(create_app(load_runtime_context())) as tc:
+        yield tc
 
 
 def test_python_menus_analyze_returns_success_data(client: TestClient) -> None:

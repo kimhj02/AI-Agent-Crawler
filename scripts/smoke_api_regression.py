@@ -146,15 +146,16 @@ def run_suite(base_url: str) -> None:
     for label, resp, expected in tests:
         _assert_status(resp, expected, label)
 
-        if "crawl/meals" in label and resp.status_code == 400:
+        if resp.status_code == 400:
             b = resp.json()
             if "Spring-native" in label:
                 if "message" not in b and not (b.get("success") is False and b.get("code")):
                     raise AssertionError(
                         f"{label}: Spring-native 400은 message 또는 v1 오류(success/code) 형태여야 합니다."
                     )
-            elif "/python/meals/crawl" in label and b.get("success") is not False:
-                raise AssertionError(f"{label}: 래핑 API는 success=false여야 합니다.")
+            elif "python/meals/crawl" in label:
+                if b.get("success") is not False:
+                    raise AssertionError(f"{label}: 래핑 API는 success=false여야 합니다.")
 
         if "/python/menus/analyze" in resp.url or "/python/menus/translate" in resp.url:
             body = resp.json()

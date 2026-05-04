@@ -18,17 +18,17 @@ def test_spring_native_crawl_meals_returns_unwrapped_json(monkeypatch: pytest.Mo
         "app.services.live_service.LiveService.load_menu_table_for_source",
         _fake_load,
     )
-    client = TestClient(create_app(load_runtime_context()))
-    resp = client.post(
-        "/api/v1/crawl/meals",
-        json={
-            "schoolName": "금오공과대학교",
-            "cafeteriaName": "학생식당",
-            "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
-            "startDate": "2026-04-21",
-            "endDate": "2026-04-27",
-        },
-    )
+    with TestClient(create_app(load_runtime_context())) as client:
+        resp = client.post(
+            "/api/v1/crawl/meals",
+            json={
+                "schoolName": "금오공과대학교",
+                "cafeteriaName": "학생식당",
+                "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
+                "startDate": "2026-04-21",
+                "endDate": "2026-04-27",
+            },
+        )
     assert resp.status_code == 200
     body = resp.json()
     assert "success" not in body
@@ -39,17 +39,17 @@ def test_spring_native_crawl_meals_returns_unwrapped_json(monkeypatch: pytest.Mo
 
 
 def test_spring_native_crawl_invalid_range_returns_400() -> None:
-    client = TestClient(create_app(load_runtime_context()))
-    resp = client.post(
-        "/api/v1/crawl/meals",
-        json={
-            "schoolName": "금오공과대학교",
-            "cafeteriaName": "학생식당",
-            "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
-            "startDate": "2026-05-10",
-            "endDate": "2026-05-01",
-        },
-    )
+    with TestClient(create_app(load_runtime_context())) as client:
+        resp = client.post(
+            "/api/v1/crawl/meals",
+            json={
+                "schoolName": "금오공과대학교",
+                "cafeteriaName": "학생식당",
+                "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
+                "startDate": "2026-05-10",
+                "endDate": "2026-05-01",
+            },
+        )
     assert resp.status_code == 400
     body = resp.json()
     assert "message" in body or (body.get("success") is False and body.get("code"))

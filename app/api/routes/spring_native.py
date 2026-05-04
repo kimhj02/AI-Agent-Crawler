@@ -13,7 +13,14 @@ from fastapi.responses import JSONResponse
 
 from app.common.service_ops import CrawlSourceUpstreamError, sanitize_url_for_log, validate_accept_language
 from app.config.runtime import API_V1_PREFIX, RuntimeContext
-from app.schemas.api_models import PythonMealCrawlRequest, PythonMenuAnalysisRequest, PythonMenuTranslationRequest
+from app.schemas.api_models import (
+    PythonMealCrawlDataResponse,
+    PythonMealCrawlRequest,
+    PythonMenuAnalysisDataResponse,
+    PythonMenuAnalysisRequest,
+    PythonMenuTranslationDataResponse,
+    PythonMenuTranslationRequest,
+)
 from app.services.live_service import LiveService
 
 logger = logging.getLogger(__name__)
@@ -29,15 +36,13 @@ def create_spring_native_router(ctx: RuntimeContext) -> APIRouter:
         "/crawl/meals",
         summary="Spring 연동 식단 크롤 (비래핑)",
         description="`mealguide.mealcrawl.crawl-path` 기본값(`/api/v1/crawl/meals`)과 동일합니다.",
-        response_model=None,
+        response_model=PythonMealCrawlDataResponse,
     )
     def crawl_meals_spring_native(request: Request, payload: PythonMealCrawlRequest = Body(...)):
         try:
             validate_accept_language(request.headers.get("Accept-Language"))
         except ValueError as e:
             return _spring_bad_request(str(e))
-        if payload.startDate > payload.endDate:
-            return _spring_bad_request("startDate는 endDate보다 이후일 수 없습니다.")
         try:
             table = service.load_menu_table_for_source(payload.cafeteriaName, payload.sourceUrl)
         except RuntimeError as e:
@@ -54,12 +59,16 @@ def create_spring_native_router(ctx: RuntimeContext) -> APIRouter:
                 "외부 크롤링 소스 조회에 실패했습니다. 잠시 후 다시 시도해주세요.",
                 status_code=502,
             )
-        meals = service.build_daily_meals(
-            cafeteria_name=payload.cafeteriaName,
-            table=table,
-            start=payload.startDate,
-            end=payload.endDate,
-        )
+        try:
+            meals = service.build_daily_meals(
+                cafeteria_name=payload.cafeteriaName,
+                table=table,
+                start=payload.startDate,
+                end=payload.endDate,
+            )
+        except Exception:
+            logger.exception("spring-native build_daily_meals failed")
+            return _spring_bad_request("식단 조회 처리 중 서버 오류가 발생했습니다.", status_code=500)
         return {
             "schoolName": payload.schoolName,
             "cafeteriaName": payload.cafeteriaName,
@@ -73,7 +82,7 @@ def create_spring_native_router(ctx: RuntimeContext) -> APIRouter:
         "/menus/analyze",
         summary="Spring 연동 메뉴 분석 (비래핑)",
         description="`mealguide.mealcrawl.analysis-path` 기본값(`/api/v1/menus/analyze`)과 동일합니다.",
-        response_model=None,
+        response_model=PythonMenuAnalysisDataResponse,
     )
     async def analyze_menus_spring_native(request: Request, payload: PythonMenuAnalysisRequest = Body(...)):
         try:
@@ -89,7 +98,7 @@ def create_spring_native_router(ctx: RuntimeContext) -> APIRouter:
         "/menus/translate",
         summary="Spring 연동 메뉴 번역 (비래핑)",
         description="`mealguide.mealcrawl.translation-path` 기본값(`/api/v1/menus/translate`)과 동일합니다.",
-        response_model=None,
+        response_model=PythonMenuTranslationDataResponse,
     )
     async def translate_menus_spring_native(request: Request, payload: PythonMenuTranslationRequest = Body(...)):
         try:

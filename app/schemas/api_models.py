@@ -90,7 +90,7 @@ class MenuAnalysisResultResponse(BaseModel):
     menuId: int
     menuName: str
     status: str
-    reason: Optional[str]
+    reason: Optional[str] = None
     modelName: str
     modelVersion: str
     analyzedAt: str
@@ -130,20 +130,20 @@ class FreeTranslationDataResponse(BaseModel):
 
 
 class RecognizedMenuItemResponse(BaseModel):
-    menuName: Optional[str]
-    confidence: Optional[float]
+    menuName: Optional[str] = None
+    confidence: Optional[float] = None
 
 
 class MenuBoardAnalyzeDataResponse(BaseModel):
-    requestId: Optional[str]
+    requestId: Optional[str] = None
     recognizedMenus: list[RecognizedMenuItemResponse]
 
 
 class FoodImageAnalyzeDataResponse(BaseModel):
-    requestId: Optional[str]
-    foodName: Optional[str]
+    requestId: Optional[str] = None
+    foodName: Optional[str] = None
     ingredients: list[IngredientItemResponse]
-    notes: Optional[str]
+    notes: Optional[str] = None
 
 
 class LegacyHealthResponse(BaseModel):

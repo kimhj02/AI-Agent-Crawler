@@ -12,7 +12,9 @@
 
 from __future__ import annotations
 
+import argparse
 import json
+import socket
 import subprocess
 import sys
 import threading
@@ -24,6 +26,14 @@ from typing import Any
 import requests
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _pick_free_port() -> int:
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return int(port)
 
 
 def _wait_http(url: str, timeout_sec: float = 20.0) -> None:
@@ -107,9 +117,18 @@ def main() -> int:
     sys.path.insert(0, str(REPO_ROOT))
     import repo_env  # noqa: PLC0415
 
+    parser = argparse.ArgumentParser(description="Spring↔Python HTTP 계약 로컬 검증")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=0,
+        help="Uvicorn 포트. 0이면 사용 가능한 포트를 자동 선택 (기본 0).",
+    )
+    args = parser.parse_args()
+
     repo_env.load_dotenv_from_repo_root()
     host = "127.0.0.1"
-    port = 8890
+    port = args.port if args.port > 0 else _pick_free_port()
     base = f"http://{host}:{port}"
 
     proc = subprocess.Popen(
