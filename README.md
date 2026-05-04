@@ -146,31 +146,103 @@ cd ../Backend && bash ./mvnw test -Dtest=PythonMealClientAdapterTest
 
 ## 환경 변수
 
-상세 주석은 **`.env.example`** 을 기준으로 하세요. 요약:
+**한 줄 요약:** 저장소에 적힌 변수를 **전부 넣을 필요는 없습니다.** `app/config/runtime.py` 기준으로, **빈 값이면 `None` 또는 코드에 박힌 기본값**이 적용되고, 서버는 대개 기동됩니다. 다만 값이 **형식에 맞지 않으면** 기동 시 `RuntimeError` 로 바로 종료됩니다(예: `WEEKLY_CRAWL_DAY=xyz`, `SERVICE_TIMEZONE=Invalid/Zone`).
 
-| 변수 | 용도 |
-|------|------|
-| `GEMINI_API_KEY` | Gemini 클라이언트. 없으면 AI·번역 관련 API는 실패하거나 비활성. |
-| `GEMINI_MODEL` | 기본 `gemini-2.5-flash` 등 덮어쓰기. |
-| `SPRING_MENUS_URL` | 주간 크롤 결과 전달 URL. 없으면 `/health` 의 `weeklyCrawlConfigured` 가 false. |
-| `SPRING_IMAGE_ANALYSIS_URL` | 이미지 상세 분석 전달. |
-| `SPRING_IMAGE_IDENTIFY_URL` | 이미지 음식명 식별 전달. |
-| `SPRING_TEXT_ANALYSIS_URL` | 텍스트 음식 분석 전달. |
-| `SPRING_API_TOKEN` | 설정 시 `/crawl-and-forward` 등에 Bearer 로 검증. |
-| `SPRING_API_KEY` | 선택: Spring 이 X-API-Key 를 요구할 때. |
-| `WEEKLY_CRAWL_DAY` / `HOUR` / `MINUTE` | 주간 루프 시각 (기본 월 06:00, `Asia/Seoul`). |
-| `SERVICE_TIMEZONE` | 타임존 이름. |
-| `WEEKLY_MENU_MODEL` / `WEEKLY_MENU_BATCH_SIZE` / `WEEKLY_MENU_SLEEP_SECONDS` | 주간 배치·슬립. |
-| `I18N_LOCALE` | 주간 크롤 관련 로케일 기본. |
-| `ENABLE_DIRECT_IMAGE_ANALYSIS` | `true` 일 때만 `/analyze-image-and-forward` 허용. |
-| `AI_MAX_CONCURRENT_TASKS` | 메뉴 분석·번역 동시성 상한. |
-| `CRAWL_SOURCE_ALLOWLIST` | 설정 시 크롤 허용 호스트 제한 (`app/services/ops.py`). |
+아래 표의 **필수**는 「그 기능을 쓰려면 반드시」라는 뜻이며, 전역 필수는 **`GEMINI_API_KEY`도 아님**입니다(없으면 크롤만 되고 AI·번역·이미지 API는 실패).
+
+### 전체 목록 (이름 · 기본값 · 용도)
+
+| 변수 | 기본값 | 그 기능을 쓰려면 |
+|------|--------|------------------|
+| `GEMINI_API_KEY` | 없음 → Gemini 클라이언트 미생성 | **메뉴 분석·번역·이미지 AI·주간 크롤(`run_weekly_crawl_once`)** 에 필요 |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | 선택. `/api/v1/python/menus/*`, 이미지 분석 등 **HTTP 라우트**에서 쓰는 모델 |
+| `WEEKLY_MENU_MODEL` | `gemini-2.5-flash-lite` | 선택. **주간 배치 크롤**(`crawl-and-forward`, 백그라운드 루프) 안 Gemini 분석에 사용 |
+| `SPRING_MENUS_URL` | 없음 | **`POST /crawl-and-forward`**, 백그라운드 주간 전달, `/health` 의 `weeklyCrawlConfigured` |
+| `SPRING_IMAGE_ANALYSIS_URL` | 없음 | **`POST /analyze-image-and-forward`** |
+| `SPRING_IMAGE_IDENTIFY_URL` | 없음 | **`POST /identify-image-and-forward`** |
+| `SPRING_TEXT_ANALYSIS_URL` | 없음 | **`POST /analyze-food-text-and-forward`** |
+| `SPRING_API_TOKEN` | 없음 | 설정 시 **`POST /crawl-and-forward`** 만 들어오는 요청에 `Authorization: Bearer …` 강제 |
+| `SPRING_API_KEY` | 없음 | 선택. Spring 수집 API가 **X-API-Key** 를 요구할 때 전송 헤더에 붙음 |
+| `WEEKLY_CRAWL_DAY` | `mon` | `mon`…`sun` 만 허용 |
+| `WEEKLY_CRAWL_HOUR` | `6` | `0`–`23` |
+| `WEEKLY_CRAWL_MINUTE` | `0` | `0`–`59` |
+| `SERVICE_TIMEZONE` | `Asia/Seoul` | IANA 이름. 잘못된 이름이면 **기동 실패** |
+| `WEEKLY_MENU_BATCH_SIZE` | `4` | 정수 ≥ 1 |
+| `WEEKLY_MENU_SLEEP_SECONDS` | `21.0` | 실수 ≥ 0 (배치 사이 대기) |
+| `I18N_LOCALE` | `en` | 주간 페이로드 요약 로케일 |
+| `ENABLE_DIRECT_IMAGE_ANALYSIS` | `false` | `true` 일 때만 **`/analyze-image-and-forward`** 허용 |
+| `AI_MAX_CONCURRENT_TASKS` | `4` | 정수 ≥ 1. **래핑 API** 메뉴 분석·번역 동시성 |
+| `CRAWL_SOURCE_ALLOWLIST` | 없음(제한 없음) | 쉼표 구분 호스트. **설정 시** 해당 호스트만 크롤 허용 (`app/services/ops.py`) |
+
+**`POST /api/v1/crawl/meals` 등 Spring-native 크롤**은 외부 급식 페이지만 보면 되므로 **`GEMINI_API_KEY` 없이도** 동작할 수 있습니다(금오 URL 등). 반면 **`/api/v1/menus/analyze`**, **`translate`**, **`/api/v1/python/...` AI 계열**, **주간 `crawl-and-forward`** 는 키가 필요합니다.
+
+### 시나리오별 `.env` 예시
+
+**1) 로컬에서 크롤 API만 검증 (Spring 없음, Gemini 없음)**
+
+```env
+# 비워 두거나 최소만
+# 외부 URL 크롤만 할 때는 키 없이도 /api/v1/crawl/meals 등 호출 가능할 수 있음
+```
+
+**2) Spring이 Python을 호출하는 전형 (백엔드에만 URL 설정, Python은 Gemini까지 씀)**
+
+```env
+GEMINI_API_KEY=AIza...your-key...
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+**3) Python이 Spring으로 주간 식단까지 밀어 넣기**
+
+```env
+GEMINI_API_KEY=AIza...
+SPRING_MENUS_URL=http://localhost:8080/api/menus/ingest
+# Spring 이 Bearer 를 요구하면:
+# SPRING_API_TOKEN=my-shared-secret
+# Spring 이 API Key 를 요구하면:
+# SPRING_API_KEY=ingest-key-123
+WEEKLY_MENU_MODEL=gemini-2.5-flash-lite
+WEEKLY_MENU_BATCH_SIZE=4
+WEEKLY_MENU_SLEEP_SECONDS=21.0
+I18N_LOCALE=en
+WEEKLY_CRAWL_DAY=mon
+WEEKLY_CRAWL_HOUR=6
+WEEKLY_CRAWL_MINUTE=0
+SERVICE_TIMEZONE=Asia/Seoul
+```
+
+**4) 레거시 “분석 후 Spring 전달” 엔드포인트까지**
+
+```env
+GEMINI_API_KEY=AIza...
+SPRING_MENUS_URL=http://localhost:8080/api/menus/ingest
+SPRING_IMAGE_IDENTIFY_URL=http://localhost:8080/api/image-identify/ingest
+SPRING_TEXT_ANALYSIS_URL=http://localhost:8080/api/food-analysis/ingest
+SPRING_IMAGE_ANALYSIS_URL=http://localhost:8080/api/image-analysis/ingest
+ENABLE_DIRECT_IMAGE_ANALYSIS=true
+SPRING_API_TOKEN=my-shared-secret
+```
+
+**5) 운영에서 크롤 대상 호스트만 제한**
+
+```env
+CRAWL_SOURCE_ALLOWLIST=www.kumoh.ac.kr,kumoh.ac.kr
+```
+
+**6) AI 호출 동시성만 조정**
+
+```env
+GEMINI_API_KEY=AIza...
+AI_MAX_CONCURRENT_TASKS=2
+```
+
+원본 한 줄짜리 주석 템플릿은 **`/.env.example`** 에 그대로 두었습니다. 변수 추가·이름 변경 시 **`app/config/runtime.py`** 와 이 README를 같이 맞추면 됩니다.
 
 ---
 
 ## 백그라운드 주간 크롤
 
-`app/config/app_factory.py` 의 **lifespan** 에서 비동기 태스크가 돌며, 설정된 요일·시각에 **`run_weekly_crawl_once`** 를 호출합니다. `SPRING_MENUS_URL` 이 비어 있으면 전달은 하지 않습니다(크롤 로직·설정은 `/health` 로 확인).
+`app/config/app_factory.py` 의 **lifespan** 에서 비동기 태스크가 돌며, 설정된 요일·시각에 **`run_weekly_crawl_once`** 를 호출합니다. `SPRING_MENUS_URL` 이 비어 있으면 호출마다 예외가 나고 로그에 `weekly crawl forwarding failed` 가 남습니다. 주간 전달을 쓰려면 URL·`GEMINI_API_KEY` 를 맞추거나, 로컬 개발 시에는 백그라운드 루프를 감안해 `.env` 를 구성하세요. 설정 여부는 **`GET /health`** 의 `weeklyCrawlConfigured` 로 확인합니다.
 
 ---
 
