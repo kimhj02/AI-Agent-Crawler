@@ -523,6 +523,16 @@ python3 scripts/smoke_api_regression.py
 python3 scripts/smoke_api_regression.py --use-existing-server --port 8000
 ```
 
+### Spring ↔ Python HTTP 계약 검증 (JVM 없이)
+
+Spring `RestClient`가 보내는 것과 동일한 `POST /api/v1/crawl/meals`를 `requests`로 호출하고, 가짜 Spring 서버로 `SpringRepository.post_json` 전달을 확인합니다.
+
+```bash
+python3 scripts/verify_spring_python_integration.py
+```
+
+실제 Spring Boot + DB + `PythonMealClientAdapter`가 돌아가는 E2E는 포함하지 않습니다. 백엔드 쪽 단위 검증은 예: `Backend`에서 `./mvnw test -Dtest=PythonMealClientAdapterTest` (Mock `RestClient`).
+
 ### Postman 컬렉션(내부 연동 최소 API)
 
 - 경로: `docs/postman/ai-agent-crawler-regression.postman_collection.json`
