@@ -136,7 +136,7 @@ def run_suite(base_url: str) -> None:
     )
     tests.append(
         (
-            "GET /openapi.json (spring-compat 비노출 확인)",
+            "GET /openapi.json (앱 인증 스텁 경로 미포함 확인)",
             _request("GET", f"{base_url}/openapi.json"),
             200,
         )
@@ -169,7 +169,7 @@ def run_suite(base_url: str) -> None:
             body = resp.json()
             paths = body.get("paths", {})
             if "/auth/login" in paths or "/api/v1/settings/language" in paths:
-                raise AssertionError("spring-compat 경로가 OpenAPI에 노출되어 있습니다.")
+                raise AssertionError("OpenAPI에 /auth/login 등 앱 전용 스텁 경로가 노출되어 있습니다.")
         print(f"[PASS] {label} -> {resp.status_code}")
         passed += 1
 
@@ -203,7 +203,7 @@ def main() -> int:
                     "--port",
                     str(args.port),
                 ],
-                env={**os.environ, "ENABLE_SPRING_COMPAT_ROUTER": "false"},
+                env={**os.environ},
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )

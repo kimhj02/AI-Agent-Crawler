@@ -8,7 +8,6 @@
   - FastAPI 라우터와 HTTP 입출력 처리
   - `live.py`: 레거시 + `/api/v1/python/*` (래핑 응답)
   - `spring_native.py`: Spring `MealCrawlProperties` 기본 경로 (`/api/v1/crawl/meals` 등, 비래핑)
-  - `spring_compat.py`: 선택적 Spring 스텁 (`ENABLE_SPRING_COMPAT_ROUTER`)
 - `app/services`
   - 유스케이스 오케스트레이션(`live_service.py`), 순수 로직(`ops.py`)
 - `app/repositories`

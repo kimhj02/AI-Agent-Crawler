@@ -10,7 +10,7 @@ Gemini API와 Python으로 금오공대 급식표를 수집/분석하고, Spring
 |------|------|
 | `main.py` | Uvicorn 진입점 (`uvicorn main:app`) |
 | `app/config` | 런타임 설정, FastAPI 앱 팩토리 |
-| `app/api/routes` | HTTP 라우터(FastAPI): `live`, `spring_native`, `spring_compat` |
+| `app/api/routes` | HTTP 라우터(FastAPI): `live`, `spring_native` |
 | `app/schemas` | Pydantic 요청·응답 모델, OpenAPI 예시 |
 | `app/services` | 유스케이스(`live_service`)·순수 로직(`ops`) |
 | `app/repositories` | 외부 I/O(Gemini, 크롤, Spring HTTP) |
@@ -105,12 +105,6 @@ curl http://localhost:8000/openapi.json
 - `POST /api/v1/translations`
 - `POST /api/v1/ai/menu-board/analyze`
 - `POST /api/v1/ai/food-images/analyze`
-
-비활성화된 호환 라우터:
-
-- `spring-compat` 라우터 코드는 유지되지만 기본 설정에서는 비활성화됩니다.
-- 활성화가 필요할 때만 `ENABLE_SPRING_COMPAT_ROUTER=true`로 실행하세요.
-- 스텁 엔드포인트까지 열어야 할 때는 `SPRING_COMPAT_STUB_MODE=true`를 함께 설정하세요.
 
 ## API 명세
 
@@ -537,7 +531,7 @@ python3 scripts/smoke_api_regression.py --use-existing-server --port 8000
 - 포함 항목:
   - health 체크
   - 식단 크롤링/분석/번역 엔드포인트
-  - OpenAPI에서 `spring-compat` 비노출 확인
+  - OpenAPI에 `/auth/login` 등 앱 전용 경로가 없는지 확인
 
 ## 운영 참고
 

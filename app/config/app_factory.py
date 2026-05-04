@@ -15,7 +15,6 @@ from fastapi.exceptions import RequestValidationError
 
 from app.config.runtime import API_V1_PREFIX, RuntimeContext
 from app.api.routes.live import create_legacy_router, create_v1_router
-from app.api.routes.spring_compat import create_spring_compat_router
 from app.api.routes.spring_native import create_spring_native_router
 from app.common.service_ops import next_run, run_weekly_crawl_once, v1_error
 
@@ -64,9 +63,6 @@ def create_app(ctx: RuntimeContext) -> FastAPI:
             "description": "Spring Boot `PythonMealClientAdapter` / `MealCrawlProperties` 기본 경로와 동일한 비래핑 JSON 응답",
         },
     ]
-    if ctx.config.enable_spring_compat_router:
-        openapi_tags.append({"name": "spring-compat", "description": "Spring Swagger 호환(스텁) 엔드포인트"})
-
     app = FastAPI(
         title="AI-Agent-Crawler Live Service",
         description="Spring 연동용 Python API 서버입니다. 성공 응답은 success/data, 실패 응답은 success/code/msg 형식을 사용합니다.",
@@ -91,6 +87,4 @@ def create_app(ctx: RuntimeContext) -> FastAPI:
     app.include_router(create_legacy_router(ctx))
     app.include_router(create_v1_router(ctx))
     app.include_router(create_spring_native_router(ctx))
-    if ctx.config.enable_spring_compat_router:
-        app.include_router(create_spring_compat_router(ctx))
     return app
