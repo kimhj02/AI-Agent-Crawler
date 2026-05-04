@@ -34,7 +34,7 @@ Gemini API와 Python으로 금오공대 급식표를 수집/분석하고, Spring
 ## 최근 변경 요약
 
 - `crawler`, `food_image`, `menu_allergy` 루트 모듈을 `app/domain/*`으로 통합
-- 계층 구조를 스프링식 단수 폴더(`config/controller/service/repository`)로 정리
+- 계층 구조를 `app/api/routes`, `app/services`, `app/repositories` 등으로 정리
 - 레거시 `user_features/live/*` 구현 파일 제거
 - Swagger/OpenAPI 계약 강화(`success/data`, `success/code/msg` 포맷 명시)
 
