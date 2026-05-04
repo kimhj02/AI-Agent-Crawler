@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from google import genai
 
-from app.util.service_ops import (
+from app.common.service_ops import (
     analyze_food_text,
     identify_food_from_image,
     map_ingredient_code,

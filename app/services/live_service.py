@@ -11,9 +11,9 @@ from zoneinfo import ZoneInfo
 import requests
 from app.config.runtime import RuntimeContext
 from app.domain.entities import FoodImageQuery, FoodTextQuery, MenuCrawlQuery, SpringForwardPayload
-from app.repository.ai_repository import AIRepository
-from app.repository.crawl_repository import CrawlRepository
-from app.repository.spring_repository import SpringRepository
+from app.repositories.ai_repository import AIRepository
+from app.repositories.crawl_repository import CrawlRepository
+from app.repositories.spring_repository import SpringRepository
 
 logger = logging.getLogger(__name__)
 BASE_INGREDIENT_CONFIDENCE = 0.95
@@ -108,7 +108,8 @@ class LiveService:
         semaphore = asyncio.Semaphore(max_concurrency)
 
         async def _analyze_single_menu(target) -> dict[str, Any]:
-            analyzed_at = datetime.now(ZoneInfo(self.cfg.timezone_name)).isoformat(timespec="seconds")
+            # Spring LocalDateTime 호환(타임존 오프셋 없이 로컬 벽시계)
+            analyzed_at = datetime.now(ZoneInfo(self.cfg.timezone_name)).strftime("%Y-%m-%dT%H:%M:%S")
             try:
                 async with semaphore:
                     analysis = await asyncio.to_thread(self.analyze_food_text, target.menuName)

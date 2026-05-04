@@ -6,7 +6,7 @@ from typing import Any
 
 import requests
 
-from app.util.service_ops import post_json
+from app.common.service_ops import post_json
 
 
 class SpringRepository:

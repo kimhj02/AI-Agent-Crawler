@@ -414,3 +414,24 @@ Input text:
     if not isinstance(translated, str) or not translated.strip():
         raise RuntimeError("모델 번역 응답 형식이 올바르지 않습니다.")
     return translated.strip()
+
+
+__all__ = [
+    "CrawlSourceUpstreamError",
+    "auth_headers",
+    "analyze_food_text",
+    "build_daily_meals",
+    "extract_date_from_column",
+    "identify_food_from_image",
+    "infer_meal_type",
+    "load_menu_table_for_source",
+    "map_ingredient_code",
+    "next_run",
+    "post_json",
+    "run_weekly_crawl_once",
+    "sanitize_url_for_log",
+    "translate_text_with_gemini",
+    "validate_accept_language",
+    "v1_error",
+    "v1_success",
+]
