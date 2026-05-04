@@ -108,7 +108,8 @@ class LiveService:
         semaphore = asyncio.Semaphore(max_concurrency)
 
         async def _analyze_single_menu(target) -> dict[str, Any]:
-            analyzed_at = datetime.now(ZoneInfo(self.cfg.timezone_name)).isoformat(timespec="seconds")
+            # Spring LocalDateTime 호환(타임존 오프셋 없이 로컬 벽시계)
+            analyzed_at = datetime.now(ZoneInfo(self.cfg.timezone_name)).strftime("%Y-%m-%dT%H:%M:%S")
             try:
                 async with semaphore:
                     analysis = await asyncio.to_thread(self.analyze_food_text, target.menuName)
