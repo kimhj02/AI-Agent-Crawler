@@ -11,9 +11,9 @@ from zoneinfo import ZoneInfo
 import requests
 from app.config.runtime import RuntimeContext
 from app.domain.entities import FoodImageQuery, FoodTextQuery, MenuCrawlQuery, SpringForwardPayload
-from app.repository.ai_repository import AIRepository
-from app.repository.crawl_repository import CrawlRepository
-from app.repository.spring_repository import SpringRepository
+from app.repositories.ai_repository import AIRepository
+from app.repositories.crawl_repository import CrawlRepository
+from app.repositories.spring_repository import SpringRepository
 
 logger = logging.getLogger(__name__)
 BASE_INGREDIENT_CONFIDENCE = 0.95

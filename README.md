@@ -4,20 +4,32 @@ Gemini API와 Python으로 금오공대 급식표를 수집/분석하고, Spring
 
 ## 현재 구조 (최신)
 
-리팩터링 이후 구조는 `app` 중심 + `scripts`/`tests` 분리 방식입니다.
+`app` 패키지 아래에 **진입 조립(`config`) / HTTP(`api`) / 스키마 / 서비스 / 저장소 / 도메인 / 공통**을 두고, `scripts`·`tests`·`user_features`는 그대로 둡니다.
 
 | 경로 | 설명 |
-|---|---|
+|------|------|
+| `main.py` | Uvicorn 진입점 (`uvicorn main:app`) |
 | `app/config` | 런타임 설정, FastAPI 앱 팩토리 |
-| `app/controller` | API 라우터(FastAPI) |
-| `app/service` | 유스케이스 서비스 |
-| `app/repository` | 외부 I/O 연동 계층 |
-| `app/domain` | 도메인 로직 (crawler/image/allergy) |
-| `app/dto` | 요청/응답 모델 |
-| `app/util` | 서비스 공통 유틸 |
-| `scripts` | CLI 실행 엔트리 |
-| `tests` | 테스트 코드 |
-| `user_features` | 확장 기능(알레르기 필터, i18n payload 등) |
+| `app/api/routes` | HTTP 라우터(FastAPI): `live`, `spring_native`, `spring_compat` |
+| `app/schemas` | Pydantic 요청·응답 모델, OpenAPI 예시 |
+| `app/services` | 유스케이스(`live_service`)·순수 로직(`ops`) |
+| `app/repositories` | 외부 I/O(Gemini, 크롤, Spring HTTP) |
+| `app/domain` | 도메인 로직(crawler / image / allergy) |
+| `app/common` | 공통 유틸·`service_ops` 재노출 |
+| `scripts` | CLI·스모크 |
+| `tests` | pytest (`live`, `integration`) |
+| `user_features` | 확장·앱 인스턴스 조립(`live_service.py`) |
+
+### Spring 기본 경로와 동일한 API
+
+`mealguide.mealcrawl` 기본값과 맞춘 **비래핑 JSON** 엔드포인트(성공 시 `success`/`data` 없음):
+
+- `POST /api/v1/crawl/meals`
+- `POST /api/v1/menus/analyze`
+- `POST /api/v1/menus/translate`
+
+기존 OpenAPI용 래핑 API는 `POST /api/v1/python/...` 그대로 유지됩니다.
+
 
 ## 최근 변경 요약
 
@@ -45,6 +57,8 @@ SPRING_TEXT_ANALYSIS_URL=http://localhost:8080/api/food-analysis/ingest
 ## 서버 실행
 
 ```bash
+python3 -m uvicorn main:app --host 0.0.0.0 --port 8000
+# 또는 (동일 앱 인스턴스)
 python3 -m uvicorn user_features.live_service:app --host 0.0.0.0 --port 8000
 ```
 
@@ -530,3 +544,4 @@ python3 scripts/smoke_api_regression.py --use-existing-server --port 8000
 - `ENABLE_DIRECT_IMAGE_ANALYSIS=true`일 때만 직접 이미지 상세분석 API 사용
 - `CRAWL_SOURCE_ALLOWLIST`로 크롤링 source host 제한 가능
 - Gemini 호출량에 맞춰 `WEEKLY_MENU_BATCH_SIZE`, `WEEKLY_MENU_SLEEP_SECONDS` 조정 권장
+

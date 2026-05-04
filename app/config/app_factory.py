@@ -14,9 +14,10 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 
 from app.config.runtime import API_V1_PREFIX, RuntimeContext
-from app.controller.live_router import create_legacy_router, create_v1_router
-from app.controller.spring_compat_router import create_spring_compat_router
-from app.util.service_ops import next_run, run_weekly_crawl_once, v1_error
+from app.api.routes.live import create_legacy_router, create_v1_router
+from app.api.routes.spring_compat import create_spring_compat_router
+from app.api.routes.spring_native import create_spring_native_router
+from app.common.service_ops import next_run, run_weekly_crawl_once, v1_error
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,10 @@ def create_app(ctx: RuntimeContext) -> FastAPI:
         {"name": "v1-meals", "description": "식단 크롤링/조회 관련 API"},
         {"name": "v1-ai", "description": "AI 분석/이미지 분석 API"},
         {"name": "v1-translation", "description": "번역 API"},
+        {
+            "name": "spring-meal-client",
+            "description": "Spring Boot `PythonMealClientAdapter` / `MealCrawlProperties` 기본 경로와 동일한 비래핑 JSON 응답",
+        },
     ]
     if ctx.config.enable_spring_compat_router:
         openapi_tags.append({"name": "spring-compat", "description": "Spring Swagger 호환(스텁) 엔드포인트"})
@@ -85,6 +90,7 @@ def create_app(ctx: RuntimeContext) -> FastAPI:
 
     app.include_router(create_legacy_router(ctx))
     app.include_router(create_v1_router(ctx))
+    app.include_router(create_spring_native_router(ctx))
     if ctx.config.enable_spring_compat_router:
         app.include_router(create_spring_compat_router(ctx))
     return app

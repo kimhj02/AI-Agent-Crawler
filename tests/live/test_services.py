@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 from app.config.runtime import RuntimeContext, ServiceConfig
-from app.service.live_service import LiveService
+from app.services.live_service import LiveService
 
 
 def _build_ctx() -> RuntimeContext:

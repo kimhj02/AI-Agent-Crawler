@@ -14,7 +14,7 @@ from fastapi import APIRouter, Body, File, Form, HTTPException, Request, Securit
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config.runtime import ALLOWED_MIME_TYPES, API_V1_PREFIX, MAX_IMAGE_SIZE, RuntimeContext
-from app.dto.api_models import (
+from app.schemas.api_models import (
     ApiErrorResponse,
     ApiSuccessResponse,
     FoodImageAnalyzeDataResponse,
@@ -31,7 +31,7 @@ from app.dto.api_models import (
     PythonMenuTranslationDataResponse,
     PythonMenuTranslationRequest,
 )
-from app.dto.openapi_examples import (
+from app.schemas.openapi_examples import (
     AI_KEY_MISSING_EXAMPLE,
     BAD_REQUEST_COM001_EXAMPLE,
     FOOD_IMAGE_ANALYZE_RESPONSE_EXAMPLE,
@@ -49,8 +49,8 @@ from app.dto.openapi_examples import (
     VALIDATION_ERROR_EXAMPLE,
     V1_INTERNAL_SERVER_ERROR_EXAMPLE,
 )
-from app.service.live_service import LiveService
-from app.util.service_ops import (
+from app.services.live_service import LiveService
+from app.common.service_ops import (
     CrawlSourceUpstreamError,
     sanitize_url_for_log,
     v1_error,

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Query, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config.runtime import RuntimeContext
-from app.dto.api_models import (
+from app.schemas.api_models import (
     AllergyOptionsDataResponse,
     AllergiesDataResponse,
     ApiErrorResponse,
@@ -32,8 +32,8 @@ from app.dto.api_models import (
     UpdateReligionRequest,
     WeeklyMealsDataResponse,
 )
-from app.service.live_service import LiveService
-from app.util.service_ops import CrawlSourceUpstreamError, v1_error, v1_success
+from app.services.live_service import LiveService
+from app.common.service_ops import CrawlSourceUpstreamError, v1_error, v1_success
 
 security = HTTPBearer(auto_error=False)
 

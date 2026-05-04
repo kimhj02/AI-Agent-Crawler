@@ -8,7 +8,7 @@ from typing import Any
 from google import genai
 
 from app.domain.entities import MenuCrawlQuery
-from app.util.service_ops import build_daily_meals, load_menu_table_for_source, run_weekly_crawl_once
+from app.common.service_ops import build_daily_meals, load_menu_table_for_source, run_weekly_crawl_once
 
 
 class CrawlRepository:
