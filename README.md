@@ -103,7 +103,7 @@ API 문서: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) · OpenAPI 
 { "success": false, "code": "PYM_400", "msg": "..." }
 ```
 
-자주 쓰이는 코드 예: `COM_001`, `COM_002`, `PYM_400`, `PYM_502`, `AI_001`, `AI_002`, `AI_003`. 세부 메시지·HTTP 코드는 OpenAPI `/docs` 의 응답 예시를 기준으로 합니다.
+래핑 API에서 자주 쓰이는 코드: `COM_001`(이미지 등 검증), `COM_002`(요청 스키마/검증), `PYM_400`, `PYM_502`, `AI_001`(Gemini 키 미설정 등). 세부 `msg`·HTTP 상태는 응답 본문과 `/docs` 예시를 따릅니다.
 
 ### 3) 레거시(루트) — 운영·전달용
 
@@ -174,9 +174,189 @@ cd ../Backend && bash ./mvnw test -Dtest=PythonMealClientAdapterTest
 
 ---
 
-## 호출 예시
+## API 레퍼런스: 호출 예시와 응답
 
-### Spring-native 크롤 (비래핑)
+아래 예시의 베이스 URL은 **`http://127.0.0.1:8000`** 입니다. JSON API에는 가능하면 **`Accept-Language: ko`** (또는 `en`, `zh-CN`, `vi`, `ja`)를 붙입니다.
+
+---
+
+### `GET /health`
+
+**호출**
+
+```bash
+curl -sS "http://127.0.0.1:8000/health"
+```
+
+**응답 200**
+
+```json
+{
+  "ok": true,
+  "weeklyCrawlConfigured": true,
+  "imageAnalysisConfigured": false,
+  "imageIdentifyConfigured": false,
+  "textAnalysisConfigured": false,
+  "directImageAnalysisEnabled": false,
+  "timezone": "Asia/Seoul"
+}
+```
+
+`weeklyCrawlConfigured` 등은 `.env` 의 `SPRING_*_URL` 설정 여부에 따라 달라집니다.
+
+---
+
+### `POST /crawl-and-forward`
+
+주간 식단 크롤·Gemini 분석 후 **`SPRING_MENUS_URL`** 로 전송합니다. `SPRING_API_TOKEN` 이 설정되어 있으면 **Bearer** 가 필요합니다.
+
+**호출 (토큰 사용 시)**
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/crawl-and-forward" \
+  -H "Authorization: Bearer YOUR_SPRING_API_TOKEN"
+```
+
+**응답 200** (전송·크롤 성공 시; `restaurants`·`analysisRows` 는 실제 페이로드에 따라 변동)
+
+```json
+{
+  "status": "ok",
+  "restaurants": 1,
+  "analysisRows": 120,
+  "i18nLocale": "en"
+}
+```
+
+**응답 401** (`SPRING_API_TOKEN` 불일치·누락)
+
+```json
+{ "detail": "Unauthorized" }
+```
+
+**응답 500** (내부 예외; 메시지는 서버 로그에 상세)
+
+```json
+{ "detail": "Internal Server Error" }
+```
+
+`SPRING_MENUS_URL` 미설정·크롤 결과 없음·Spring HTTP 실패 등도 500 으로 이어질 수 있습니다.
+
+---
+
+### `POST /identify-image-and-forward`
+
+**요청:** `multipart/form-data` — 필드 `image`(파일), 선택 **`request_id`**.
+
+**호출**
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/identify-image-and-forward" \
+  -F "image=@./sample-food.jpg" \
+  -F "request_id=req-001"
+```
+
+**응답 200** (`identified` 내용은 모델 출력 예시)
+
+```json
+{
+  "status": "ok",
+  "forwardStatus": 200,
+  "identified": {
+    "foodNameKo": "김치찌개",
+    "confidence": 0.91
+  }
+}
+```
+
+**응답 500** (`SPRING_IMAGE_IDENTIFY_URL` 미설정 / `GEMINI_API_KEY` 미설정 등)
+
+```json
+{ "detail": "SPRING_IMAGE_IDENTIFY_URL is not set" }
+```
+
+**응답 502** (Spring 이 2xx 가 아닐 때)
+
+```json
+{ "detail": "Spring 응답 오류 HTTP 502" }
+```
+
+(실제 `detail` 문자열에 상태코드·본문 일부가 포함될 수 있습니다.)
+
+---
+
+### `POST /analyze-food-text-and-forward`
+
+**요청:** `application/json` — 필드명 **`food_name`**
+
+**호출**
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/analyze-food-text-and-forward" \
+  -H "Content-Type: application/json" \
+  -d '{"food_name": "김치찌개"}'
+```
+
+**응답 200** (`analysis` 는 Gemini JSON 스키마 예시)
+
+```json
+{
+  "status": "ok",
+  "forwardStatus": 200,
+  "analysis": {
+    "foodNameKo": "김치찌개",
+    "ingredientsKo": ["배추", "돼지고기"],
+    "allergensKo": [{ "name": "밀", "reason": "부침가루 가능성" }]
+  }
+}
+```
+
+**응답 500** (`SPRING_TEXT_ANALYSIS_URL` 미설정)
+
+```json
+{ "detail": "SPRING_TEXT_ANALYSIS_URL is not set" }
+```
+
+---
+
+### `POST /analyze-image-and-forward`
+
+**조건:** `ENABLE_DIRECT_IMAGE_ANALYSIS=true` 이고 `SPRING_IMAGE_ANALYSIS_URL`·`GEMINI_API_KEY` 필요.
+
+**호출**
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/analyze-image-and-forward" \
+  -F "image=@./sample-food.jpg" \
+  -F "user_id=u-1" \
+  -F "request_id=req-002"
+```
+
+**응답 200** (`analysis` 구조는 이미지 분석 파이프라인 결과에 따름)
+
+```json
+{
+  "status": "ok",
+  "forwardStatus": 200,
+  "analysis": {
+    "음식명": "김치찌개",
+    "추정_식재료": [{ "재료": "대두", "신뢰도": 0.88 }],
+    "주의사항": "추정 결과이며 실제와 다를 수 있습니다."
+  }
+}
+```
+
+**응답 403** (직접 이미지 분석 비활성)
+
+```json
+{ "detail": "Direct image analysis is disabled." }
+```
+
+---
+
+### `POST /api/v1/crawl/meals` (Spring-native, 비래핑)
+
+**호출**
 
 ```bash
 curl -sS -X POST "http://127.0.0.1:8000/api/v1/crawl/meals" \
@@ -191,18 +371,423 @@ curl -sS -X POST "http://127.0.0.1:8000/api/v1/crawl/meals" \
   }'
 ```
 
-성공 시 루트에 `meals` 배열이 포함됩니다. 실패 시 예: `{"message":"외부 크롤링 소스 조회에 실패했습니다. 잠시 후 다시 시도해주세요."}` (HTTP 502).
+**응답 200**
 
-### OpenAPI 래핑 크롤 (동일 요청 본문, 응답만 래핑)
+```json
+{
+  "schoolName": "금오공과대학교",
+  "cafeteriaName": "학생식당",
+  "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
+  "startDate": "2026-04-21",
+  "endDate": "2026-04-27",
+  "meals": [
+    {
+      "mealDate": "2026-04-21",
+      "mealType": "LUNCH",
+      "menus": [
+        { "cornerName": "학생식당", "displayOrder": 1, "menuName": "김치찌개" },
+        { "cornerName": "학생식당", "displayOrder": 2, "menuName": "된장찌개" }
+      ]
+    }
+  ]
+}
+```
+
+**응답 400** (식당·URL 조건 불가)
+
+```json
+{ "message": "요청 식단 조회 조건이 유효하지 않거나 데이터가 없습니다." }
+```
+
+**응답 502** (외부 크롤 소스 실패)
+
+```json
+{ "message": "외부 크롤링 소스 조회에 실패했습니다. 잠시 후 다시 시도해주세요." }
+```
+
+**응답 400** (`Accept-Language` 허용 목록 위반 등; `message` 에 전체 설명 문자열)
+
+```json
+{ "message": "지원하지 않는 Accept-Language: fr. 허용: ko, en, zh-CN, vi, ja" }
+```
+
+---
+
+### `POST /api/v1/menus/analyze` (Spring-native)
+
+**호출**
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/api/v1/menus/analyze" \
+  -H "Content-Type: application/json" \
+  -H "Accept-Language: ko" \
+  -d '{"menus":[{"menuId":101,"menuName":"김치찌개"}]}'
+```
+
+**응답 200**
+
+```json
+{
+  "results": [
+    {
+      "menuId": 101,
+      "menuName": "김치찌개",
+      "status": "COMPLETED",
+      "reason": null,
+      "modelName": "gemini",
+      "modelVersion": "gemini-2.5-flash",
+      "analyzedAt": "2026-04-27T12:00:00",
+      "ingredients": [
+        { "ingredientCode": "SOYBEAN", "confidence": 0.88 },
+        { "ingredientCode": "WHEAT", "confidence": 0.81 }
+      ]
+    }
+  ]
+}
+```
+
+**응답 500** (`GEMINI_API_KEY` 없음)
+
+```json
+{ "message": "GEMINI_API_KEY is not set" }
+```
+
+---
+
+### `POST /api/v1/menus/translate` (Spring-native)
+
+**호출**
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/api/v1/menus/translate" \
+  -H "Content-Type: application/json" \
+  -H "Accept-Language: ko" \
+  -d '{"menus":[{"menuId":101,"menuName":"김치찌개"}],"targetLanguages":["en","ja"]}'
+```
+
+**응답 200**
+
+```json
+{
+  "results": [
+    {
+      "menuId": 101,
+      "sourceName": "김치찌개",
+      "translations": [
+        { "langCode": "en", "translatedName": "Kimchi stew" },
+        { "langCode": "ja", "translatedName": "キムチチゲ" }
+      ],
+      "translationErrors": []
+    }
+  ]
+}
+```
+
+**응답 500** (`GEMINI_API_KEY` 없음)
+
+```json
+{ "message": "GEMINI_API_KEY is not set" }
+```
+
+---
+
+### `POST /api/v1/python/meals/crawl` (래핑)
+
+요청 본문은 Spring-native 크롤과 **동일 스키마**입니다.
+
+**호출**
 
 ```bash
 curl -sS -X POST "http://127.0.0.1:8000/api/v1/python/meals/crawl" \
   -H "Content-Type: application/json" \
   -H "Accept-Language: ko" \
-  -d '{ "schoolName": "금오공과대학교", "cafeteriaName": "학생식당", "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do", "startDate": "2026-04-21", "endDate": "2026-04-27" }'
+  -d '{
+    "schoolName": "금오공과대학교",
+    "cafeteriaName": "학생식당",
+    "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
+    "startDate": "2026-04-21",
+    "endDate": "2026-04-27"
+  }'
 ```
 
-나머지 엔드포인트의 요청·응답 스키마·예시는 **`/docs`** 와 `app/schemas/openapi_examples.py` 를 참고하는 것이 가장 정확합니다.
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "schoolName": "금오공과대학교",
+    "cafeteriaName": "학생식당",
+    "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
+    "startDate": "2026-04-21",
+    "endDate": "2026-04-27",
+    "meals": [
+      {
+        "mealDate": "2026-04-21",
+        "mealType": "LUNCH",
+        "menus": [
+          { "cornerName": "학생식당", "displayOrder": 1, "menuName": "김치찌개" },
+          { "cornerName": "학생식당", "displayOrder": 2, "menuName": "된장찌개" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**응답 400** (조건 불가)
+
+```json
+{
+  "success": false,
+  "code": "PYM_400",
+  "msg": "요청 식단 조회 조건이 유효하지 않거나 데이터가 없습니다."
+}
+```
+
+**응답 502** (업스트림 실패)
+
+```json
+{
+  "success": false,
+  "code": "PYM_502",
+  "msg": "외부 크롤링 소스 조회에 실패했습니다. 잠시 후 다시 시도해주세요."
+}
+```
+
+**응답 400** (JSON 스키마 위반 등)
+
+```json
+{
+  "success": false,
+  "code": "COM_002",
+  "msg": "요청 데이터 변환 과정에서 오류가 발생했습니다."
+}
+```
+
+---
+
+### `POST /api/v1/python/menus/analyze` (래핑)
+
+**호출**
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/api/v1/python/menus/analyze" \
+  -H "Content-Type: application/json" \
+  -H "Accept-Language: ko" \
+  -d '{"menus":[{"menuId":101,"menuName":"김치찌개"}]}'
+```
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "menuId": 101,
+        "menuName": "김치찌개",
+        "status": "COMPLETED",
+        "reason": null,
+        "modelName": "gemini",
+        "modelVersion": "gemini-2.5-flash",
+        "analyzedAt": "2026-04-27T12:00:00",
+        "ingredients": [
+          { "ingredientCode": "SOYBEAN", "confidence": 0.88 },
+          { "ingredientCode": "WHEAT", "confidence": 0.81 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**응답 500**
+
+```json
+{
+  "success": false,
+  "code": "AI_001",
+  "msg": "GEMINI_API_KEY is not set"
+}
+```
+
+---
+
+### `POST /api/v1/python/menus/translate` (래핑)
+
+**호출**
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/api/v1/python/menus/translate" \
+  -H "Content-Type: application/json" \
+  -H "Accept-Language: ko" \
+  -d '{"menus":[{"menuId":101,"menuName":"김치찌개"}],"targetLanguages":["en","ja"]}'
+```
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "menuId": 101,
+        "sourceName": "김치찌개",
+        "translations": [
+          { "langCode": "en", "translatedName": "Kimchi stew" },
+          { "langCode": "ja", "translatedName": "キムチチゲ" }
+        ],
+        "translationErrors": []
+      }
+    ]
+  }
+}
+```
+
+**응답 500**
+
+```json
+{
+  "success": false,
+  "code": "AI_001",
+  "msg": "GEMINI_API_KEY is not set"
+}
+```
+
+---
+
+### `POST /api/v1/translations` (래핑)
+
+**호출**
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/api/v1/translations" \
+  -H "Content-Type: application/json" \
+  -H "Accept-Language: ko" \
+  -d '{"sourceLang":"ko","targetLang":"en","text":"이 음식에 밀가루가 들어가나요?"}'
+```
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "sourceLang": "ko",
+    "targetLang": "en",
+    "text": "이 음식에 밀가루가 들어가나요?",
+    "translatedText": "Does this dish contain flour?"
+  }
+}
+```
+
+**응답 500** (`GEMINI_API_KEY` 없음)
+
+```json
+{
+  "success": false,
+  "code": "AI_001",
+  "msg": "GEMINI_API_KEY is not set"
+}
+```
+
+---
+
+### `POST /api/v1/ai/menu-board/analyze` (래핑, multipart)
+
+**호출**
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/api/v1/ai/menu-board/analyze" \
+  -H "Accept-Language: ko" \
+  -F "image=@./sample-menu-board.jpg" \
+  -F "requestId=req-001"
+```
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "requestId": "req-001",
+    "recognizedMenus": [{ "menuName": "김치찌개", "confidence": 0.82 }]
+  }
+}
+```
+
+**응답 400** (빈 파일)
+
+```json
+{
+  "success": false,
+  "code": "COM_001",
+  "msg": "이미지 파일이 비어 있습니다."
+}
+```
+
+**응답 500**
+
+```json
+{
+  "success": false,
+  "code": "AI_001",
+  "msg": "GEMINI_API_KEY is not set"
+}
+```
+
+---
+
+### `POST /api/v1/ai/food-images/analyze` (래핑, multipart)
+
+**호출**
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/api/v1/ai/food-images/analyze" \
+  -H "Accept-Language: ko" \
+  -F "image=@./sample-food.jpg" \
+  -F "requestId=req-002"
+```
+
+**응답 200** (`ingredients` 는 모델·매핑 결과에 따라 변동)
+
+```json
+{
+  "success": true,
+  "data": {
+    "requestId": "req-002",
+    "foodName": "김치찌개",
+    "ingredients": [
+      { "ingredientCode": "SOYBEAN", "confidence": 0.9 },
+      { "ingredientCode": "WHEAT", "confidence": 0.75 }
+    ],
+    "notes": "추정 결과이며 실제와 다를 수 있습니다."
+  }
+}
+```
+
+**응답 400** (빈 파일)
+
+```json
+{
+  "success": false,
+  "code": "COM_001",
+  "msg": "이미지 파일이 비어 있습니다."
+}
+```
+
+**응답 413** (10MB 초과 시, 메시지 예시)
+
+```json
+{
+  "success": false,
+  "code": "COM_001",
+  "msg": "이미지 파일이 너무 큽니다 (최대 10MB)."
+}
+```
 
 ---
 
