@@ -1,123 +1,185 @@
 # AI-Agent-Crawler
 
-Gemini API와 Python으로 금오공대 급식표를 수집/분석하고, Spring Boot와 연동하는 서비스입니다.
+금오공과대학교 급식 페이지 등 **외부 소스에서 식단을 크롤링**하고, **Google Gemini**로 메뉴 분석·번역·이미지 추론을 수행합니다. **Spring Boot**와는 두 가지 방식으로 붙을 수 있습니다.
 
-## 현재 구조 (최신)
+1. **Spring → Python** — 백엔드가 `RestClient`로 이 서비스의 **비래핑** API를 호출 (`MealCrawlProperties` 기본 경로와 동일).
+2. **Python → Spring (레거시)** — 주간 크롤·이미지/텍스트 분석 후 Spring 수집 URL로 HTTP POST (`SPRING_*_URL`).
 
-`app` 패키지 아래에 **진입 조립(`config`) / HTTP(`api`) / 스키마 / 서비스 / 저장소 / 도메인 / 공통**을 두고, `scripts`·`tests`·`user_features`는 그대로 둡니다.
+---
 
-| 경로 | 설명 |
-|------|------|
-| `main.py` | Uvicorn 진입점 (`uvicorn main:app`) |
-| `app/config` | 런타임 설정, FastAPI 앱 팩토리 |
-| `app/api/routes` | HTTP 라우터(FastAPI): `live`, `spring_native` |
-| `app/schemas` | Pydantic 요청·응답 모델, OpenAPI 예시 |
-| `app/services` | 유스케이스(`live_service`)·순수 로직(`ops`) |
-| `app/repositories` | 외부 I/O(Gemini, 크롤, Spring HTTP) |
-| `app/domain` | 도메인 로직(crawler / image / allergy) |
-| `app/common` | 공통 유틸·`service_ops` 재노출 |
-| `scripts` | CLI·스모크 |
-| `tests` | pytest (`live`, `integration`) |
-| `user_features` | 확장·앱 인스턴스 조립(`live_service.py`) |
+## 요구 사항
 
-### Spring 기본 경로와 동일한 API
+- **Python 3.10+** 권장 (의존성 일부는 3.9에서 경고가 날 수 있음).
+- 크롤·Gemini 호출 시 **인터넷** 접근.
+- AI 기능(분석·번역·이미지)에는 **`GEMINI_API_KEY`** 필요.
 
-`mealguide.mealcrawl` 기본값과 맞춘 **비래핑 JSON** 엔드포인트(성공 시 `success`/`data` 없음):
-
-- `POST /api/v1/crawl/meals`
-- `POST /api/v1/menus/analyze`
-- `POST /api/v1/menus/translate`
-
-기존 OpenAPI용 래핑 API는 `POST /api/v1/python/...` 그대로 유지됩니다.
-
-
-## 최근 변경 요약
-
-- `crawler`, `food_image`, `menu_allergy` 루트 모듈을 `app/domain/*`으로 통합
-- 계층 구조를 `app/api/routes`, `app/services`, `app/repositories` 등으로 정리
-- 레거시 `user_features/live/*` 구현 파일 제거
-- Swagger/OpenAPI 계약 강화(`success/data`, `success/code/msg` 포맷 명시)
+---
 
 ## 빠른 시작
 
 ```bash
 pip install -r requirements.txt
 cp .env.example .env
+# .env 에 GEMINI_API_KEY 등 필요한 값 설정
 ```
 
-필수 환경변수:
-
-```bash
-GEMINI_API_KEY=...
-SPRING_MENUS_URL=http://localhost:8080/api/menus/ingest
-SPRING_IMAGE_IDENTIFY_URL=http://localhost:8080/api/image-identify/ingest
-SPRING_TEXT_ANALYSIS_URL=http://localhost:8080/api/food-analysis/ingest
-```
-
-## 서버 실행
+서버 기동(권장 진입점):
 
 ```bash
 python3 -m uvicorn main:app --host 0.0.0.0 --port 8000
-# 또는 (동일 앱 인스턴스)
+```
+
+동일 앱 인스턴스:
+
+```bash
 python3 -m uvicorn user_features.live_service:app --host 0.0.0.0 --port 8000
 ```
 
-상태 확인:
+확인:
 
 ```bash
-curl http://localhost:8000/health
+curl -sS http://127.0.0.1:8000/health
 ```
 
-Swagger/OpenAPI:
+API 문서: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) · OpenAPI JSON: `/openapi.json`
 
-```bash
-open http://localhost:8000/docs
-curl http://localhost:8000/openapi.json
-```
+---
 
-## API 규칙
+## 저장소 구조
 
-- Base URL: `/api/v1`
-- 성공 응답:
+| 경로 | 역할 |
+|------|------|
+| `main.py` | Uvicorn 진입점 (`uvicorn main:app`). `user_features.live_service.app` 와 동일 인스턴스. |
+| `user_features/live_service.py` | `.env` 로드 후 `create_app(load_runtime_context())` 조립. |
+| `app/config` | `runtime`(환경변수·`ServiceConfig`), `app_factory`(FastAPI·라우터·주간 태스크). |
+| `app/api/routes` | `live`(레거시 + `/api/v1` 래핑), `spring_native`(비래핑 Spring 연동). |
+| `app/schemas` | Pydantic 모델·OpenAPI 예시 연계. |
+| `app/services` | `live_service`, `ops` 등 유스케이스. |
+| `app/repositories` | Spring HTTP, 크롤 등 외부 I/O. |
+| `app/domain` | 크롤러·이미지·알레르기 도메인 로직. |
+| `app/common` | 공통 유틸. |
+| `scripts` | 스모크·검증·배치용 CLI. |
+| `tests` | `pytest` — `live`, `integration` 등. |
+| `docs/postman` | 회귀용 Postman 컬렉션. |
+
+`spring_compat` 스텁 레이어는 제거되었습니다. Spring과의 **공식 HTTP 계약**은 아래 **Spring-native** 경로와 **OpenAPI 래핑** 경로 두 축으로 정리되어 있습니다.
+
+---
+
+## API 축 요약
+
+모든 `/api/v1/*` JSON API는 가능하면 **`Accept-Language`** 헤더를 보냅니다. 허용 예: `ko`, `en`, `zh-CN`, `vi`, `ja` (`en-US` 형태도 허용).
+
+### 1) Spring-native (비래핑) — `PythonMealClientAdapter` / `MealCrawlProperties` 기본값과 정렬
+
+| 메서드 | 경로 | 성공 시 본문 |
+|--------|------|----------------|
+| `POST` | `/api/v1/crawl/meals` | `schoolName`, `cafeteriaName`, `sourceUrl`, `startDate`, `endDate`, `meals` **직접** ( `success` / `data` 없음 ) |
+| `POST` | `/api/v1/menus/analyze` | `{ "results": [...] }` |
+| `POST` | `/api/v1/menus/translate` | `{ "results": [...] }` |
+
+**오류 시** HTTP 상태 코드와 함께 **`{"message": "..."}`** 형태(JSON). 크롤 조건 오류는 주로 `400`, 외부 소스 실패는 `502`, Gemini 미설정 등은 `500` 등으로 구분됩니다.
+
+### 2) OpenAPI 래핑 (`/api/v1/python/...` 및 기타)
+
+| 메서드 | 경로 | 응답 형식 |
+|--------|------|-----------|
+| `POST` | `/api/v1/python/meals/crawl` | `success` + `data` |
+| `POST` | `/api/v1/python/menus/analyze` | 동일 |
+| `POST` | `/api/v1/python/menus/translate` | 동일 |
+| `POST` | `/api/v1/translations` | 자유 문장 번역 |
+| `POST` | `/api/v1/ai/menu-board/analyze` | `multipart/form-data` (`image`, 선택 `requestId`) |
+| `POST` | `/api/v1/ai/food-images/analyze` | 동일 |
+
+**성공**
 
 ```json
-{
-  "success": true,
-  "data": {}
-}
+{ "success": true, "data": { } }
 ```
 
-- 실패 응답:
+**실패**
 
 ```json
-{
-  "success": false,
-  "code": "COM_002",
-  "msg": "요청 데이터 변환 과정에서 오류가 발생했습니다."
-}
+{ "success": false, "code": "PYM_400", "msg": "..." }
 ```
 
-핵심 API:
+자주 쓰이는 코드 예: `COM_001`, `COM_002`, `PYM_400`, `PYM_502`, `AI_001`, `AI_002`, `AI_003`. 세부 메시지·HTTP 코드는 OpenAPI `/docs` 의 응답 예시를 기준으로 합니다.
 
-- `POST /api/v1/python/meals/crawl`
-- `POST /api/v1/python/menus/analyze`
-- `POST /api/v1/python/menus/translate`
-- `POST /api/v1/translations`
-- `POST /api/v1/ai/menu-board/analyze`
-- `POST /api/v1/ai/food-images/analyze`
+### 3) 레거시(루트) — 운영·전달용
 
-## API 명세
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| `GET` | `/health` | 설정 요약(`weeklyCrawlConfigured` 등). |
+| `POST` | `/crawl-and-forward` | 주간 식단 크롤 후 `SPRING_MENUS_URL` 로 전달. `SPRING_API_TOKEN` 설정 시 **Bearer 토큰** 필요. |
+| `POST` | `/identify-image-and-forward` | 이미지 → 음식명 식별 → `SPRING_IMAGE_IDENTIFY_URL`. |
+| `POST` | `/analyze-food-text-and-forward` | 텍스트 분석 → `SPRING_TEXT_ANALYSIS_URL`. |
+| `POST` | `/analyze-image-and-forward` | 상세 이미지 분석 → `SPRING_IMAGE_ANALYSIS_URL`. **`ENABLE_DIRECT_IMAGE_ANALYSIS=true`** 일 때만. |
 
-### 1) `POST /api/v1/python/meals/crawl`
+---
 
-- 용도: 학교/식당/기간 기준으로 식단 크롤링
-- 요청 `Content-Type`: `application/json`
-- 권장 헤더: `Accept-Language: ko`
+## Spring Boot와 연동할 때
 
-요청 예시 (`curl`):
+### Spring이 Python을 호출하는 경우
+
+백엔드(예: `mealguide`)에서 **`MEAL_CRAWL_PYTHON_BASE_URL`** 등으로 이 서비스 베이스 URL을 지정하고, **`/api/v1/crawl/meals`** 등 비래핑 경로로 호출합니다. 로컬 검증 시 스케줄러/수동 트리거로 `PythonMealClientAdapter` 가 실제 요청을 보내는지 로그·브레이크포인트로 확인합니다.
+
+### Python이 Spring을 호출하는 경우
+
+`.env` 에 **`SPRING_MENUS_URL`**, **`SPRING_IMAGE_*`**, **`SPRING_TEXT_ANALYSIS_URL`** 등을 맞춘 뒤, **`POST /crawl-and-forward`** 등 레거시 엔드포인트를 호출해 Spring 쪽 로그·DB 변화를 확인합니다.
+
+### JVM 없이 HTTP 계약만 검증
 
 ```bash
-curl -sS -X POST "http://localhost:8000/api/v1/python/meals/crawl" \
+python3 scripts/verify_spring_python_integration.py
+```
+
+- `RestClient` 와 동일한 방식으로 **`POST /api/v1/crawl/meals`** 를 호출해 비래핑 응답을 검사합니다.
+- 로컬 모의 HTTP 서버로 **`SpringRepository.post_json`** 전달 경로를 검사합니다.
+
+**포함하지 않는 것:** 실제 Spring Boot + DB + Redis 전체 E2E. 백엔드 쪽 어댑터 단위 테스트 예:
+
+```bash
+cd ../Backend && bash ./mvnw test -Dtest=PythonMealClientAdapterTest
+```
+
+---
+
+## 환경 변수
+
+상세 주석은 **`.env.example`** 을 기준으로 하세요. 요약:
+
+| 변수 | 용도 |
+|------|------|
+| `GEMINI_API_KEY` | Gemini 클라이언트. 없으면 AI·번역 관련 API는 실패하거나 비활성. |
+| `GEMINI_MODEL` | 기본 `gemini-2.5-flash` 등 덮어쓰기. |
+| `SPRING_MENUS_URL` | 주간 크롤 결과 전달 URL. 없으면 `/health` 의 `weeklyCrawlConfigured` 가 false. |
+| `SPRING_IMAGE_ANALYSIS_URL` | 이미지 상세 분석 전달. |
+| `SPRING_IMAGE_IDENTIFY_URL` | 이미지 음식명 식별 전달. |
+| `SPRING_TEXT_ANALYSIS_URL` | 텍스트 음식 분석 전달. |
+| `SPRING_API_TOKEN` | 설정 시 `/crawl-and-forward` 등에 Bearer 로 검증. |
+| `SPRING_API_KEY` | 선택: Spring 이 X-API-Key 를 요구할 때. |
+| `WEEKLY_CRAWL_DAY` / `HOUR` / `MINUTE` | 주간 루프 시각 (기본 월 06:00, `Asia/Seoul`). |
+| `SERVICE_TIMEZONE` | 타임존 이름. |
+| `WEEKLY_MENU_MODEL` / `WEEKLY_MENU_BATCH_SIZE` / `WEEKLY_MENU_SLEEP_SECONDS` | 주간 배치·슬립. |
+| `I18N_LOCALE` | 주간 크롤 관련 로케일 기본. |
+| `ENABLE_DIRECT_IMAGE_ANALYSIS` | `true` 일 때만 `/analyze-image-and-forward` 허용. |
+| `AI_MAX_CONCURRENT_TASKS` | 메뉴 분석·번역 동시성 상한. |
+| `CRAWL_SOURCE_ALLOWLIST` | 설정 시 크롤 허용 호스트 제한 (`app/services/ops.py`). |
+
+---
+
+## 백그라운드 주간 크롤
+
+`app/config/app_factory.py` 의 **lifespan** 에서 비동기 태스크가 돌며, 설정된 요일·시각에 **`run_weekly_crawl_once`** 를 호출합니다. `SPRING_MENUS_URL` 이 비어 있으면 전달은 하지 않습니다(크롤 로직·설정은 `/health` 로 확인).
+
+---
+
+## 호출 예시
+
+### Spring-native 크롤 (비래핑)
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/api/v1/crawl/meals" \
   -H "Content-Type: application/json" \
   -H "Accept-Language: ko" \
   -d '{
@@ -129,423 +191,70 @@ curl -sS -X POST "http://localhost:8000/api/v1/python/meals/crawl" \
   }'
 ```
 
-요청 본문 예시:
+성공 시 루트에 `meals` 배열이 포함됩니다. 실패 시 예: `{"message":"외부 크롤링 소스 조회에 실패했습니다. 잠시 후 다시 시도해주세요."}` (HTTP 502).
 
-```json
-{
-  "schoolName": "금오공과대학교",
-  "cafeteriaName": "학생식당",
-  "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
-  "startDate": "2026-04-21",
-  "endDate": "2026-04-27"
-}
-```
-
-성공 응답 예시 (`meals`는 일자·끼니별로 채워질 수 있음):
-
-```json
-{
-  "success": true,
-  "data": {
-    "schoolName": "금오공과대학교",
-    "cafeteriaName": "학생식당",
-    "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do",
-    "startDate": "2026-04-21",
-    "endDate": "2026-04-27",
-    "meals": [
-      {
-        "mealDate": "2026-04-21",
-        "mealType": "LUNCH",
-        "menus": [
-          {"cornerName": "학생식당", "displayOrder": 1, "menuName": "김치찌개"},
-          {"cornerName": "학생식당", "displayOrder": 2, "menuName": "된장찌개"}
-        ]
-      }
-    ]
-  }
-}
-```
-
-실패 응답 예시 (외부 소스 조회 실패, HTTP 502):
-
-```json
-{
-  "success": false,
-  "code": "PYM_502",
-  "msg": "외부 크롤링 소스 조회에 실패했습니다. 잠시 후 다시 시도해주세요."
-}
-```
-
-실패 응답 예시 (조건 불가, HTTP 400):
-
-```json
-{
-  "success": false,
-  "code": "PYM_400",
-  "msg": "요청 식단 조회 조건이 유효하지 않거나 데이터가 없습니다."
-}
-```
-
-주요 실패 코드: `COM_002`, `PYM_400`, `PYM_502`, `PYM_500`
-
-### 2) `POST /api/v1/python/menus/analyze`
-
-- 용도: 메뉴 텍스트를 AI로 분석해 재료 코드 추정
-- 요청 `Content-Type`: `application/json`
-
-요청 예시 (`curl`):
+### OpenAPI 래핑 크롤 (동일 요청 본문, 응답만 래핑)
 
 ```bash
-curl -sS -X POST "http://localhost:8000/api/v1/python/menus/analyze" \
+curl -sS -X POST "http://127.0.0.1:8000/api/v1/python/meals/crawl" \
   -H "Content-Type: application/json" \
   -H "Accept-Language: ko" \
-  -d '{"menus":[{"menuId":101,"menuName":"김치찌개"}]}'
+  -d '{ "schoolName": "금오공과대학교", "cafeteriaName": "학생식당", "sourceUrl": "https://www.kumoh.ac.kr/ko/restaurant01.do", "startDate": "2026-04-21", "endDate": "2026-04-27" }'
 ```
 
-요청 본문 예시:
+나머지 엔드포인트의 요청·응답 스키마·예시는 **`/docs`** 와 `app/schemas/openapi_examples.py` 를 참고하는 것이 가장 정확합니다.
 
-```json
-{
-  "menus": [
-    {"menuId": 101, "menuName": "김치찌개"}
-  ]
-}
-```
+---
 
-성공 응답 예시:
+## Swagger UI
 
-```json
-{
-  "success": true,
-  "data": {
-    "results": [
-      {
-        "menuId": 101,
-        "menuName": "김치찌개",
-        "status": "COMPLETED",
-        "reason": null,
-        "modelName": "gemini",
-        "modelVersion": "gemini-2.5-flash",
-        "analyzedAt": "2026-04-27T12:00:00",
-        "ingredients": [
-          {"ingredientCode": "SOYBEAN", "confidence": 0.88},
-          {"ingredientCode": "WHEAT", "confidence": 0.81}
-        ]
-      }
-    ]
-  }
-}
-```
+1. 서버 기동 후 `/docs` 접속.
+2. 엔드포인트 선택 → **Try it out** → 본문 예시 선택(등록된 경우) → **Execute**.
+3. `/crawl-and-forward` 는 `SPRING_API_TOKEN` 이 있으면 우측 **Authorize** 에 `Bearer <token>` 입력.
 
-실패 응답 예시 (`GEMINI_API_KEY` 미설정, HTTP 500):
+---
 
-```json
-{
-  "success": false,
-  "code": "AI_001",
-  "msg": "GEMINI_API_KEY is not set"
-}
-```
+## CLI (`scripts/`)
 
-주요 실패 코드: `COM_002`, `AI_001`
+| 스크립트 | 설명 |
+|----------|------|
+| `smoke_api_regression.py` | 서버 자동 기동(기본 포트 `8010`) 또는 `--use-existing-server` 로 최소 API 회귀. |
+| `verify_spring_python_integration.py` | Spring↔Python HTTP 계약 스모크(위 참고). |
+| `crawl_menus.py` | 메뉴 크롤 CLI. |
+| `push_menus.py` / `push_extended.py` | Spring 쪽으로 푸시(드라이런 옵션 등). |
+| `i18n_summary.py` / `allergy_filter.py` | CSV·알레르기 보조. |
 
-### 3) `POST /api/v1/python/menus/translate`
-
-- 용도: 메뉴명을 다국어로 번역
-- 요청 `Content-Type`: `application/json`
-
-요청 예시 (`curl`):
+예:
 
 ```bash
-curl -sS -X POST "http://localhost:8000/api/v1/python/menus/translate" \
-  -H "Content-Type: application/json" \
-  -H "Accept-Language: ko" \
-  -d '{"menus":[{"menuId":101,"menuName":"김치찌개"}],"targetLanguages":["en","ja"]}'
-```
-
-요청 본문 예시:
-
-```json
-{
-  "menus": [
-    {"menuId": 101, "menuName": "김치찌개"}
-  ],
-  "targetLanguages": ["en", "ja"]
-}
-```
-
-성공 응답 예시:
-
-```json
-{
-  "success": true,
-  "data": {
-    "results": [
-      {
-        "menuId": 101,
-        "sourceName": "김치찌개",
-        "translations": [
-          {"langCode": "en", "translatedName": "Kimchi stew"},
-          {"langCode": "ja", "translatedName": "キムチチゲ"}
-        ],
-        "translationErrors": []
-      }
-    ]
-  }
-}
-```
-
-실패 응답 예시 (`GEMINI_API_KEY` 미설정, HTTP 500):
-
-```json
-{
-  "success": false,
-  "code": "AI_001",
-  "msg": "GEMINI_API_KEY is not set"
-}
-```
-
-주요 실패 코드: `COM_002`, `AI_001`
-
-### 4) `POST /api/v1/translations`
-
-- 용도: 자유 문장 번역
-- 요청 `Content-Type`: `application/json`
-
-요청 예시 (`curl`):
-
-```bash
-curl -sS -X POST "http://localhost:8000/api/v1/translations" \
-  -H "Content-Type: application/json" \
-  -H "Accept-Language: ko" \
-  -d '{"sourceLang":"ko","targetLang":"en","text":"이 음식에 밀가루가 들어가나요?"}'
-```
-
-요청 본문 예시:
-
-```json
-{
-  "sourceLang": "ko",
-  "targetLang": "en",
-  "text": "이 음식에 밀가루가 들어가나요?"
-}
-```
-
-성공 응답 예시:
-
-```json
-{
-  "success": true,
-  "data": {
-    "sourceLang": "ko",
-    "targetLang": "en",
-    "text": "이 음식에 밀가루가 들어가나요?",
-    "translatedText": "Does this dish contain flour?"
-  }
-}
-```
-
-주요 실패 코드: `COM_002`, `AI_002`
-
-### 5) `POST /api/v1/ai/menu-board/analyze`
-
-- 용도: 메뉴판 이미지에서 메뉴명 인식
-- 요청 `Content-Type`: `multipart/form-data`
-- 폼 필드:
-  - `image`: 이미지 파일
-  - `requestId`: 선택
-
-요청 예시 (`curl`, 로컬 이미지 경로는 환경에 맞게 변경):
-
-```bash
-curl -sS -X POST "http://localhost:8000/api/v1/ai/menu-board/analyze" \
-  -H "Accept-Language: ko" \
-  -F "image=@./sample-menu-board.jpg" \
-  -F "requestId=req-001"
-```
-
-성공 응답 예시:
-
-```json
-{
-  "success": true,
-  "data": {
-    "requestId": "req-001",
-    "recognizedMenus": [
-      {"menuName": "김치찌개", "confidence": 0.82}
-    ]
-  }
-}
-```
-
-실패 응답 예시 (빈 파일 등, HTTP 400):
-
-```json
-{
-  "success": false,
-  "code": "COM_001",
-  "msg": "이미지 파일이 비어 있습니다."
-}
-```
-
-주요 실패 코드: `COM_001`, `AI_001`, `AI_003`
-
-### 6) `POST /api/v1/ai/food-images/analyze`
-
-- 용도: 음식 이미지에서 식재료 추정
-- 요청 `Content-Type`: `multipart/form-data`
-- 폼 필드:
-  - `image`: 이미지 파일
-  - `requestId`: 선택
-
-요청 예시 (`curl`):
-
-```bash
-curl -sS -X POST "http://localhost:8000/api/v1/ai/food-images/analyze" \
-  -H "Accept-Language: ko" \
-  -F "image=@./sample-food.jpg" \
-  -F "requestId=req-002"
-```
-
-성공 응답 예시:
-
-```json
-{
-  "success": true,
-  "data": {
-    "requestId": "req-002",
-    "foodName": "김치찌개",
-    "ingredients": [
-      {"ingredientCode": "SOYBEAN", "confidence": 0.9},
-      {"ingredientCode": "WHEAT", "confidence": 0.75}
-    ],
-    "notes": "추정 결과이며 실제와 다를 수 있습니다."
-  }
-}
-```
-
-실패 응답 예시 (빈 파일 등, HTTP 400):
-
-```json
-{
-  "success": false,
-  "code": "COM_001",
-  "msg": "이미지 파일이 비어 있습니다."
-}
-```
-
-주요 실패 코드: `COM_001`, `AI_001`, `AI_003`
-
-### 공통 헤더
-
-- `Accept-Language`: `ko`, `en`, `zh-CN`, `vi`, `ja` (예: `en-US` 허용)
-
-레거시 호환 API:
-
-- `GET /health`
-- `POST /crawl-and-forward`
-- `POST /identify-image-and-forward`
-- `POST /analyze-food-text-and-forward`
-- `POST /analyze-image-and-forward`
-
-## Swagger 사용 방법
-
-### 1) Swagger UI 접속
-
-```bash
-python3 -m uvicorn user_features.live_service:app --host 0.0.0.0 --port 8000
-open http://localhost:8000/docs
-```
-
-### 2) OpenAPI JSON 확인
-
-```bash
-curl http://localhost:8000/openapi.json
-```
-
-`/api/v1` JSON 엔드포인트에는 **요청 본문 예시**가 등록되어 있고, 각 작업의 **응답(200·400·500 등) 예시**도 OpenAPI에 포함되어 있습니다. Swagger UI에서 `Try it out` 시 본문 드롭다운으로 예시를 고를 수 있으며, 응답 섹션에서 상태 코드별 예시를 확인할 수 있습니다.
-
-### 3) 엔드포인트 테스트 절차
-
-1. `/docs` 접속 후 테스트할 API 선택
-2. `Try it out` 클릭
-3. 요청 파라미터/Body 입력
-4. `Execute` 클릭
-5. Response Body/Code 확인
-
-### 4) 인증이 필요한 레거시 API 테스트
-
-- `POST /crawl-and-forward`는 `SPRING_API_TOKEN`이 설정된 경우 Bearer 토큰 필요
-- Swagger 우측 상단 `Authorize`에서 `Bearer <token>` 형태로 입력
-
-## CLI 실행 (scripts)
-
-```bash
-python3 scripts/crawl_menus.py
+python3 scripts/smoke_api_regression.py
 python3 scripts/push_menus.py --dry-run --indent 2
-python3 scripts/push_extended.py --dry-run
-python3 scripts/i18n_summary.py --csv menu_allergy_gemini.csv --locale en
-python3 scripts/allergy_filter.py --csv menu_allergy_gemini.csv --allergens "난류,우유" --json
 ```
 
-## Spring 전송 Payload
-
-주간 메뉴 통합 전송(`SPRING_MENUS_URL`)은 Swagger 래핑 형식을 사용합니다.
-
-```json
-{
-  "success": true,
-  "data": {
-    "source": "https://www.kumoh.ac.kr",
-    "capturedAt": "2026-04-07T03:00:00+00:00",
-    "restaurants": []
-  }
-}
-```
+---
 
 ## 테스트
 
 ```bash
 python3 -m pytest -q tests/live
+python3 -m pytest -q tests/integration
 ```
 
-### API 회귀 테스트 (자동, 내부 연동 최소 API 기준)
+- `tests/integration/test_spring_native_contract.py` — 비래핑 경로 계약.
+- `tests/integration/test_ai_agent_api.py` — `GEMINI_API_KEY` 없으면 skip, 있으면 실 API.
 
-```bash
-python3 scripts/smoke_api_regression.py
-```
+Postman: `docs/postman/ai-agent-crawler-regression.postman_collection.json` (`baseUrl` 변수 기본 `http://127.0.0.1:8000`).
 
-- 서버를 자동으로 기동/종료하면서 내부 연동용 최소 API를 점검합니다.
-- 기본 실행 포트는 `8010`이며, 실행 중인 로컬 개발 서버(`8000`)와 충돌하지 않도록 설계되어 있습니다.
-- 이미 서버가 떠 있다면 아래처럼 실행합니다.
+---
 
-```bash
-python3 scripts/smoke_api_regression.py --use-existing-server --port 8000
-```
+## Spring 으로 넘기는 주간 페이로드(개념)
 
-### Spring ↔ Python HTTP 계약 검증 (JVM 없이)
+`SPRING_MENUS_URL` 로 보내는 본문은 앱 내부에서 가공된 **성공 래핑 형태** 등 레거시 스키마를 따릅니다. 정확한 필드는 `LiveService`·레포지토리 구현과 Spring 수집 API 스펙을 함께 보세요. (OpenAPI 문서의 `/api/v1/python/meals/crawl` 응답 `data` 와 혼동하지 마세요.)
 
-Spring `RestClient`가 보내는 것과 동일한 `POST /api/v1/crawl/meals`를 `requests`로 호출하고, 가짜 Spring 서버로 `SpringRepository.post_json` 전달을 확인합니다.
+---
 
-```bash
-python3 scripts/verify_spring_python_integration.py
-```
+## 운영 시 참고
 
-실제 Spring Boot + DB + `PythonMealClientAdapter`가 돌아가는 E2E는 포함하지 않습니다. 백엔드 쪽 단위 검증은 예: `Backend`에서 `./mvnw test -Dtest=PythonMealClientAdapterTest` (Mock `RestClient`).
-
-### Postman 컬렉션(내부 연동 최소 API)
-
-- 경로: `docs/postman/ai-agent-crawler-regression.postman_collection.json`
-- 변수:
-  - `baseUrl` (기본값: `http://127.0.0.1:8000`)
-- 포함 항목:
-  - health 체크
-  - 식단 크롤링/분석/번역 엔드포인트
-  - OpenAPI에 `/auth/login` 등 앱 전용 경로가 없는지 확인
-
-## 운영 참고
-
-- `ENABLE_DIRECT_IMAGE_ANALYSIS=true`일 때만 직접 이미지 상세분석 API 사용
-- `CRAWL_SOURCE_ALLOWLIST`로 크롤링 source host 제한 가능
-- Gemini 호출량에 맞춰 `WEEKLY_MENU_BATCH_SIZE`, `WEEKLY_MENU_SLEEP_SECONDS` 조정 권장
-
+- Gemini 호출량에 맞춰 **`WEEKLY_MENU_BATCH_SIZE`**, **`WEEKLY_MENU_SLEEP_SECONDS`** 조정.
+- 외부 크롤 남용 방지·보안을 위해 **`CRAWL_SOURCE_ALLOWLIST`** 사용을 검토.
+- 이미지 업로드는 **최대 10MB**, 허용 MIME: JPEG / PNG / WebP / GIF (`app/config/runtime.py`).
