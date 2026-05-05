@@ -803,6 +803,16 @@ curl -sS -X POST "http://127.0.0.1:8000/api/v1/ai/menu-board/analyze" \
 }
 ```
 
+**응답 413** (10MB 초과 시, 메시지 예시)
+
+```json
+{
+  "success": false,
+  "code": "COM_001",
+  "msg": "이미지 파일이 너무 큽니다 (최대 10MB)."
+}
+```
+
 **응답 500**
 
 ```json

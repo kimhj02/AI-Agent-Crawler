@@ -1,0 +1,46 @@
+{
+  "model": "gemini-2.5-flash",
+  "systemInstruction": "너는 음식 성분 분석 보조 도우미다. 항상 JSON으로만 답변한다.",
+  "prompt": "김치찌개에 들어갈 가능성이 높은 알레르기 유발 성분을 한국어로 3개만 알려줘.",
+  "responseSchema": {
+    "type": "object",
+    "properties": {
+      "foodName": {
+        "type": "string"
+      },
+      "ingredients": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "ingredientCode": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": "number"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "ingredientCode",
+            "confidence"
+          ]
+        }
+      },
+      "notes": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "foodName",
+      "ingredients"
+    ]
+  },
+  "generationConfig": {
+    "temperature": 0.2,
+    "topP": 0.9,
+    "maxOutputTokens": 1024
+  }
+}

@@ -1,0 +1,4 @@
+{"id":"text-case-001","inputText":"김치찌개","target":"ingredients","lang":"ko","expectedContains":["SOYBEAN","WHEAT"],"note":"대표 한식 케이스"}
+{"id":"text-case-002","inputText":"까르보나라","target":"ingredients","lang":"ko","expectedContains":["MILK","EGG","WHEAT"],"note":"유제품/계란/밀 포함 가능"}
+{"id":"text-case-003","inputText":"된장찌개","target":"ingredients","lang":"ko","expectedContains":["SOYBEAN"],"note":"대두 기반 조미료 확인"}
+{"id":"text-case-004","inputText":"새우볶음밥","target":"ingredients","lang":"ko","expectedContains":["CRUSTACEAN","EGG"],"note":"갑각류/계란 확인"}
