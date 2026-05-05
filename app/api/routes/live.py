@@ -249,16 +249,6 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
                     }
                 },
             },
-            413: {
-                "model": ApiErrorResponse,
-                "content": {
-                    "application/json": {
-                        "examples": {
-                            "용량초과": {"value": PAYLOAD_TOO_LARGE_COM001_EXAMPLE},
-                        }
-                    }
-                },
-            },
             500: {
                 "model": ApiErrorResponse,
                 "content": {
@@ -319,16 +309,6 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
                     "application/json": {
                         "examples": {
                             "검증실패": {"value": VALIDATION_ERROR_EXAMPLE},
-                        }
-                    }
-                },
-            },
-            413: {
-                "model": ApiErrorResponse,
-                "content": {
-                    "application/json": {
-                        "examples": {
-                            "용량초과": {"value": PAYLOAD_TOO_LARGE_COM001_EXAMPLE},
                         }
                     }
                 },
@@ -396,6 +376,16 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
                     }
                 },
             },
+            413: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "용량초과": {"value": PAYLOAD_TOO_LARGE_COM001_EXAMPLE},
+                        }
+                    }
+                },
+            },
         },
     )
     async def translate_menus_v1(
@@ -449,6 +439,16 @@ def create_v1_router(ctx: RuntimeContext) -> APIRouter:
                     "application/json": {
                         "examples": {
                             "키미설정": {"summary": "GEMINI 미설정", "value": AI_KEY_MISSING_EXAMPLE},
+                        }
+                    }
+                },
+            },
+            413: {
+                "model": ApiErrorResponse,
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "용량초과": {"value": PAYLOAD_TOO_LARGE_COM001_EXAMPLE},
                         }
                     }
                 },

@@ -10,6 +10,7 @@ from pathlib import Path
 import sys
 import time
 
+from google.api_core.exceptions import ServiceUnavailable
 from google import genai
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -35,6 +36,10 @@ def main() -> int:
     parser.add_argument("--max-retries", type=int, default=2, help="503 발생 시 이미지당 최대 재시도 횟수")
     parser.add_argument("--output", default="gemini_food_image_validation_results.json", help="결과 저장 파일명")
     args = parser.parse_args()
+    if args.wait_seconds < 0:
+        raise SystemExit("--wait-seconds 는 0 이상의 정수여야 합니다.")
+    if args.max_retries < 0:
+        raise SystemExit("--max-retries 는 0 이상의 정수여야 합니다.")
 
     repo_env.load_dotenv_from_repo_root()
     api_key = (os.environ.get("GEMINI_API_KEY") or "").strip()
@@ -60,14 +65,19 @@ def main() -> int:
                 item["raw"] = analyzed
                 print(f"[OK] {image_path.name} | 음식명={item['foodName']} | 재료수={item['ingredientCount']}")
                 break
-            except Exception as exc:  # noqa: BLE001
+            except ServiceUnavailable as exc:
                 last_error = str(exc)
-                is_retryable = "503 UNAVAILABLE" in last_error
-                if is_retryable and attempt < args.max_retries:
+                if attempt < args.max_retries:
                     wait_retry = min(60, args.wait_seconds + 10 * (attempt + 1))
                     print(f"[RETRY] {image_path.name} | {last_error} | {wait_retry}초 후 재시도")
                     time.sleep(wait_retry)
                     continue
+                item["ok"] = False
+                item["error"] = last_error
+                print(f"[FAIL] {image_path.name} | {last_error}")
+                break
+            except Exception as exc:  # noqa: BLE001
+                last_error = str(exc)
                 item["ok"] = False
                 item["error"] = last_error
                 print(f"[FAIL] {image_path.name} | {last_error}")
