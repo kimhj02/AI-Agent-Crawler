@@ -175,3 +175,9 @@ BAD_REQUEST_COM001_EXAMPLE: dict = {
     "code": "COM_001",
     "msg": "이미지 파일이 비어 있습니다.",
 }
+
+PAYLOAD_TOO_LARGE_COM001_EXAMPLE: dict = {
+    "success": False,
+    "code": "COM_001",
+    "msg": "이미지 파일이 너무 큽니다 (최대 10MB).",
+}
